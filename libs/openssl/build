@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2155
+set -euo pipefail
+trap "exit" INT
+# shellcheck source=./../../dev/lib/utils.sh
+source "${BASH_SOURCE%/*}/../../dev/lib/utils.sh"
+
+NAME="openssl"
+REPO_URL="https://github.com/openssl/openssl"
+VERSION="3.4.0"
+
+export CROSS_COMPILE="${CROSS_COMPILE:?}"
+export BUILD_TIME="${BUILD_TIME:?}"
+export BUILD_DIR="${BUILD_DIR:?}"
+export INSTALL_DIR="${INSTALL_DIR:?}"
+export OUT_DIR="${OUT_DIR:?}"
+
+build_dir="$(abspath "${BUILD_DIR}")"
+install_dir="$(abspath "${INSTALL_DIR}")"
+out_dir="$(abspath "${OUT_DIR}")"
+
+mkdir -p "${build_dir}"
+pushd "${build_dir}" >/dev/null
+{
+  src_dir="${NAME}-${VERSION}"
+
+  if [ ! -d "${src_dir}" ]; then
+    nicely git clone --quiet --recursive --depth=1 -b "openssl-${VERSION}" "${REPO_URL}" "${src_dir}"
+  fi
+
+  pushd "${src_dir}" >/dev/null
+  {
+    # Run `./Configure LIST` to display all possible platforms
+    case "${CROSS_COMPILE}" in
+    x86_64-unknown-linux-*)
+      platform="linux-x86_64"
+      ;;
+    aarch64-unknown-linux-*)
+      platform="linux-aarch64"
+      ;;
+    x86_64-pc-windows-gnu)
+      platform="mingw64"
+      ;;
+    aarch64-apple-darwin)
+      platform="darwin64-arm64"
+      ;;
+    x86_64-apple-darwin)
+      platform="darwin64-x86_64"
+      ;;
+    esac
+
+    export CC="ccache ${CC}"
+    export CXX="ccache ${CXX}"
+
+    nicely CROSS_COMPILE='' ./Configure \
+      "${platform:?}" \
+      --prefix="${install_dir}" \
+      --libdir="lib" \
+      --openssldir="${install_dir}/etc/openssl" \
+      no-apps \
+      no-dso \
+      no-engine \
+      no-shared \
+      2>&1 | log "${build_dir}/build.log"
+
+    nicely make -s -j"${JOBS}" 2>&1 | log "${build_dir}/build.log"
+    nicely make -s install_sw 2>&1 | log "${build_dir}/build.log"
+
+    sed -i'' -e 's|/opt/openssl|${prefix}|g' "${INSTALL_DIR}/lib/pkgconfig/libcrypto.pc"
+    sed -i'' -e 's|/opt/openssl|${prefix}|g' "${INSTALL_DIR}/lib/pkgconfig/libssl.pc"
+    sed -i'' -e 's|/opt/openssl|${prefix}|g' "${INSTALL_DIR}/lib/pkgconfig/openssl.pc"
+
+    package_all "${install_dir}" "${out_dir}/${NAME}-${VERSION}-static-${CROSS_COMPILE}-${BUILD_TIME}"
+  }
+  popd >/dev/null
+}
+popd >/dev/null
