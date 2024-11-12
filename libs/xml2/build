@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2155
+set -euo pipefail
+trap "exit" INT
+# shellcheck source=./../../dev/lib/utils.sh
+source "${BASH_SOURCE%/*}/../../dev/lib/utils.sh"
+
+NAME="libxml2"
+REPO_URL="https://gitlab.gnome.org/GNOME/libxml2.git"
+VERSION="2.12.9"
+
+export CROSS_COMPILE="${CROSS_COMPILE:?}"
+export BUILD_TIME="${BUILD_TIME:?}"
+export BUILD_DIR="${BUILD_DIR:?}"
+export INSTALL_DIR="${INSTALL_DIR:?}"
+export OUT_DIR="${OUT_DIR:?}"
+
+build_dir="$(abspath "${BUILD_DIR}")"
+install_dir="$(abspath "${INSTALL_DIR}")"
+out_dir="$(abspath "${OUT_DIR}")"
+
+mkdir -p "${build_dir}"
+pushd "${build_dir}" >/dev/null
+{
+  src_dir="${NAME}-${VERSION}"
+
+  if [ ! -d "${src_dir}" ]; then
+    nicely git clone --quiet --recursive --depth=1 -b "v${VERSION}" "${REPO_URL}" "${src_dir}"
+  fi
+
+  pushd "${src_dir}" >/dev/null
+  {
+    nicely cmake -S "." -B "build" \
+      -Wno-dev -Wno-deprecated \
+      -DCMAKE_INSTALL_PREFIX="${install_dir}" \
+      -DCMAKE_INSTALL_LIBDIR="lib" \
+      -DCMAKE_INSTALL_INCLUDEDIR="include" \
+      -DCMAKE_BUILD_TYPE="Release" \
+      -DCMAKE_VERBOSE_MAKEFILE="OFF" \
+      \
+      -DBUILD_SHARED_LIBS="OFF" \
+      -DBUILD_STATIC_LIBS="ON" \
+      \
+      -DLIBXML2_WITH_ICONV="OFF" \
+      -DLIBXML2_WITH_LZMA="OFF" \
+      -DLIBXML2_WITH_PROGRAMS="OFF" \
+      -DLIBXML2_WITH_PYTHON="OFF" \
+      -DLIBXML2_WITH_TESTS="OFF" \
+      -DLIBXML2_WITH_ZLIB="OFF" \
+      2>& \
+      1 | log "${build_dir}/build.log"
+
+    nicely cmake --build "build" --parallel="${JOBS}" -- 2>&1 | log "${build_dir}/build.log"
+
+    nicely cmake --install "build" 2>&1 | log "${build_dir}/build.log"
+
+    mv "${install_dir}/include/libxml2/libxml" "${install_dir}/include/libxml"
+    rm -rf "${install_dir}/include/libxml2"
+
+    sed -i "s|prefix=${install_dir}|prefix=\$\{pcfiledir\}/../..|g" "${install_dir}/lib/pkgconfig/libxml-2.0.pc"
+    sed -i'' 's|-I${includedir}/libxml2|-I${includedir}|' "${install_dir}/lib/pkgconfig/libxml-2.0.pc"
+
+    find "${install_dir}/lib/cmake" -type f \
+      -exec sed -i'' 's|set(LIBXML2_INCLUDE_DIR    ${PACKAGE_PREFIX_DIR}/include/libxml2)|set(LIBXML2_INCLUDE_DIR    ${PACKAGE_PREFIX_DIR}/include)|g; s|INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include/libxml2"|INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"|g' {} +
+
+    package_all "${install_dir}" "${out_dir}/${NAME}-${VERSION}-static-${CROSS_COMPILE}-${BUILD_TIME}"
+  }
+  popd >/dev/null
+}
+popd >/dev/null

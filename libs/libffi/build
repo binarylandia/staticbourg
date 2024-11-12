@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2155
+set -euo pipefail
+trap "exit" INT
+# shellcheck source=./../../dev/lib/utils.sh
+source "${BASH_SOURCE%/*}/../../dev/lib/utils.sh"
+
+NAME="libffi"
+REPO_URL="https://github.com/libffi/libffi"
+VERSION="3.4.6"
+
+export CROSS_COMPILE="${CROSS_COMPILE:?}"
+export BUILD_TIME="${BUILD_TIME:?}"
+export BUILD_DIR="${BUILD_DIR:?}"
+export INSTALL_DIR="${INSTALL_DIR:?}"
+export OUT_DIR="${OUT_DIR:?}"
+
+build_dir="$(abspath "${BUILD_DIR}")"
+install_dir="$(abspath "${INSTALL_DIR}")"
+out_dir="$(abspath "${OUT_DIR}")"
+
+mkdir -p "${build_dir}"
+pushd "${build_dir}" >/dev/null
+{
+  src_dir="${NAME}-${VERSION}"
+
+  if [ ! -d "${src_dir}" ]; then
+    nicely git clone --quiet --recursive --depth=1 -b "v${VERSION}" "${REPO_URL}" "${src_dir}"
+    pushd "${src_dir}" >/dev/null
+    {
+      nicely ./autogen.sh | log "${build_dir}/build.log"
+    }
+    popd >/dev/null
+  fi
+
+  pushd "${src_dir}" >/dev/null
+  {
+
+    nicely ./configure \
+      --prefix="${install_dir}" \
+      --disable-multi-os-directory \
+      --disable-docs \
+      --enable-shared=no \
+      --enable-static=yes \
+      2>&1 | log "${build_dir}/build.log"
+
+    nicely make -s -j"${JOBS}" 2>&1 | log "${build_dir}/build.log"
+    nicely make -s install 2>&1 | log "${build_dir}/build.log"
+
+    sed -i "s|prefix=${INSTALL_DIR}|prefix=\$\{pcfiledir\}/../..|g" "${INSTALL_DIR}/lib/pkgconfig/${NAME}.pc"
+
+    package_all "${install_dir}" "${out_dir}/${NAME}-${VERSION}-static-${CROSS_COMPILE}-${BUILD_TIME}"
+  }
+  popd >/dev/null
+}
+popd >/dev/null
+
+#
+##!/usr/bin/env bash
+#
+#set -euxo pipefail
+#
+#NAME="libffi"
+#REPO_URL="https://github.com/libffi/libffi"
+#VERSION="3.4.5"
+#
+#BUILD_DIR=".build"
+#INSTALL_DIR="/opt/${NAME}"
+#OUT_DIR=".out"
+#
+#NICE="nice -19 ionice -c2 -n5"
+#JOBS="${JOBS:=$(($(nproc --all) + 2))}"
+#
+#build_time="$(date '+%Y%m%d%H%M%S')"
+#
+#export CFLAGS="-w -g0 -O2 ${CFLAGS:-}"
+#export CXXFLAGS="-w -g0 -O2 ${CXXFLAGS:-}"
+#export LDFLAGS="-s ${LDFLAGS:-}"
+#
+#export CFLAGS="-static-libgcc -static-libstdc++ ${CFLAGS:-}"
+#export CXXFLAGS="-static-libgcc -static-libstdc++ ${CXXFLAGS:-}"
+#export LDFLAGS="-static-libgcc -static-libstdc++ ${LDFLAGS:-}"
+#
+#export CFLAGS="-fPIC ${CFLAGS:-}"
+#export CXXFLAGS="-fPIC ${CXXFLAGS:-}"
+#export LDFLAGS="-fPIC ${LDFLAGS:-}"
+#
+#function abspath() {
+#  readlink -m "$1"
+#}
+#
+#function log() {
+#  tee -a "${1}" | stdbuf -oL grep --color=always -iE "error|fail|cannot|can't|unable|"
+#}
+#
+#function package() {
+#  local input_dir="${1}"
+#  local output_tarball="${2}"
+#
+#  ${NICE} find "${input_dir}" -printf "%P\n" \
+#    | ${NICE} tar --no-recursion -cf - -C "${input_dir}" --files-from=- \
+#    | ${NICE} xz -T0 -k > "${output_tarball}"
+#}
+#
+#build_dir="$(abspath ${BUILD_DIR})"
+#mkdir -p "${build_dir}"
+#outdir="$(abspath "${OUT_DIR}")"
+#mkdir -p "${outdir}"
+#
+#pushd "$build_dir" >/dev/null
+#  src_dir="${NAME}-${VERSION}"
+#
+#  if [ ! -d "${src_dir}" ]; then
+#    mkdir -p "${src_dir}"
+#    curl -fsSL "https://github.com/libffi/libffi/releases/download/v${VERSION}/libffi-${VERSION}.tar.gz" | tar --strip-components=1 -C "${src_dir}" -xz
+#  fi
+#
+#  pushd "${src_dir}" >/dev/null
+#    ${NICE} ./configure \
+#      --prefix="${INSTALL_DIR}" \
+#      --disable-multi-os-directory \
+#      --disable-docs \
+#      --enable-shared=no \
+#      --enable-static=yes \
+#      2>&1 | log "build.log"
+#
+#    ${NICE} make -j"${JOBS}" 2>&1 | log "build.log"
+#    ${NICE} make install 2>&1 | log "build.log"
+#
+#    sed -i "s|prefix=${INSTALL_DIR}|prefix=\$\{pcfiledir\}/../..|g" "${INSTALL_DIR}/lib/pkgconfig/${NAME}.pc"
+#
+#    cp "build.log" "${INSTALL_DIR}/"
+#
+#    package "${INSTALL_DIR}" "${outdir}/${NAME}-${VERSION}-static-${build_time}.tar.xz"
+#  popd >/dev/null
+#popd >/dev/null

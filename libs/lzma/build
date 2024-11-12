@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2155
+set -euo pipefail
+trap "exit" INT
+# shellcheck source=./../../dev/lib/utils.sh
+source "${BASH_SOURCE%/*}/../../dev/lib/utils.sh"
+
+NAME="lzma"
+VERSION="5.6.3"
+REPO_URL="https://github.com/tukaani-project/xz"
+
+export CROSS_COMPILE="${CROSS_COMPILE:?}"
+export BUILD_TIME="${BUILD_TIME:?}"
+export BUILD_DIR="${BUILD_DIR:?}"
+export INSTALL_DIR="${INSTALL_DIR:?}"
+export OUT_DIR="${OUT_DIR:?}"
+
+build_dir="$(abspath "${BUILD_DIR}")"
+install_dir="$(abspath "${INSTALL_DIR}")"
+out_dir="$(abspath "${OUT_DIR}")"
+
+mkdir -p "${build_dir}"
+pushd "${build_dir}" >/dev/null
+{
+  src_dir="${NAME}-${VERSION}"
+
+  if [ ! -d "${src_dir}" ]; then
+    nicely git clone --quiet --recursive --depth=1 -b "v${VERSION}" "${REPO_URL}" "${src_dir}"
+    pushd "${src_dir}" >/dev/null
+    {
+      (nicely ./autogen.sh || true) | log "${build_dir}/build.log"
+    }
+    popd >/dev/null
+  fi
+
+  pushd "${src_dir}" >/dev/null
+  {
+    export CC="ccache ${CC}"
+    export CXX="ccache ${CXX}"
+
+    host="${CROSS_COMPILE}"
+    case "${CROSS_COMPILE}" in
+    x86_64-pc-windows-gnu)
+      host="x86_64-w64-mingw32"
+      ;;
+    esac
+
+    nicely ./configure \
+      --prefix='' \
+      --host="${host}" \
+      --disable-doc \
+      --disable-lzma-links \
+      --disable-lzmadec \
+      --disable-lzmainfo \
+      --disable-nls \
+      --disable-scripts \
+      --disable-shared \
+      --disable-xz \
+      --disable-xzdec \
+      2>&1 | log "${build_dir}/build.log"
+
+    nicely make -j"${JOBS}" 2>&1 | log "${build_dir}/build.log"
+    nicely make -s install DESTDIR="${install_dir}" 2>&1 | log "${build_dir}/build.log"
+
+    sed -i "s|prefix=.*|prefix=\$\{pcfiledir\}/../..|g" "${install_dir}/lib/pkgconfig/liblzma.pc"
+    sed -i "s|exec_prefix=.*|exec_prefix=\$\{prefix\}|g" "${install_dir}/lib/pkgconfig/liblzma.pc"
+    sed -i "s|libdir=.*|libdir=\$\{exec_prefix\}/lib|g" "${install_dir}/lib/pkgconfig/liblzma.pc"
+    sed -i "s|includedir=.*|includedir=\$\{exec_prefix\}/include|g" "${install_dir}/lib/pkgconfig/liblzma.pc"
+
+    package_all "${install_dir}" "${out_dir}/${NAME}-${VERSION}-static-${CROSS_COMPILE}-${BUILD_TIME}"
+  }
+  popd >/dev/null
+}
+popd >/dev/null
