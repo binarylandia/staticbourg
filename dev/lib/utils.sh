@@ -162,7 +162,7 @@ function package_xz() {
   local input_dir="${1}"
   local output_basename="${2}"
   mkdir -p "$(dirname "${output_basename}")"
-  nicely "find '${input_dir}' -printf '%P\\n' | tar --no-recursion -cf - -C '${input_dir}' --files-from=- | pixz -p '$(nproc)' -5 >'${output_basename}.tar.xz'"
+  nicely "find '${input_dir}' -printf '%P\\n' | tar --posix -cf '${output_basename}.tar.xz' -C '${input_dir}' --files-from=- --use-compress-program='pixz -p $(nproc) -5'"
 }
 export -f package_xz
 
@@ -170,7 +170,7 @@ function package_gz() {
   local input_dir="${1}"
   local output_basename="${2}"
   mkdir -p "$(dirname "${output_basename}")"
-  nicely "find '${input_dir}' -printf '%P\n' | tar --no-recursion -cf - -C '${input_dir}' --files-from=- | pigz -p '$(nproc)' -7 >'${output_basename}.tar.gz'"
+  nicely "find '${input_dir}' -printf '%P\\n' | tar --posix -cf '${output_basename}.tar.gz' -C '${input_dir}' --files-from=- --use-compress-program='pigz -p $(nproc) -7'"
 }
 export -f package_gz
 
@@ -178,7 +178,7 @@ function package_zst() {
   local input_dir="${1}"
   local output_basename="${2}"
   mkdir -p "$(dirname "${output_basename}")"
-  nicely "find '${input_dir}' -printf '%P\n' | tar --no-recursion -cf - -C '${input_dir}' --files-from=- | zstdmt -q -T'$(nproc)' -7 -o '${output_basename}.tar.zst'"
+  nicely "find '${input_dir}' -printf '%P\\n' | tar --posix -cf '${output_basename}.tar.zst' -C '${input_dir}' --files-from=- --use-compress-program='zstdmt -q -T$(nproc) -7'"
 }
 export -f package_zst
 
@@ -196,12 +196,14 @@ export -f package_all
 function fetch_tarball() {
   local tarball_url="${1}"
   local dest_dir="${2}"
-  nicely mkdir -p "${dest_dir}"
+  shift 2
+  local tar_params=("$@")
+  mkdir -p "${dest_dir}"
   case "${tarball_url}" in
-  *.tar.gz | *.tgz) nicely "curl -fsSL '${tarball_url}' | pigz -dc -p ${JOBS} | tar --strip-components=1 -xf - -C '${dest_dir}'" ;;
-  *.tar.xz | *.txz) nicely "curl -fsSL '${tarball_url}' | pixz -dc -p ${JOBS} | tar --strip-components=1 -xf - -C '${dest_dir}'" ;;
-  *.tar.zst | *.tzst) nicely "curl -fsSL '${tarball_url}' | pzstd -dc -p ${JOBS} | tar --strip-components=1 -xf - -C '${dest_dir}'" ;;
-  *.tar.bz2 | *.tbz | *.tb2) nicely "curl -fsSL '${tarball_url}' | pbzip2 -dc -p${JOBS} | tar --strip-components=1 -xf - -C '${dest_dir}'" ;;
+  *.tar.gz | *.tgz) nicely "curl -fsSL '${tarball_url}' | tar -xf - --posix -C '${dest_dir}' ${tar_params[*]} --use-compress-program='pigz -dc -p ${JOBS}'" ;;
+  *.tar.xz | *.txz) nicely "curl -fsSL '${tarball_url}' | tar -xf - --posix -C '${dest_dir}' ${tar_params[*]} --use-compress-program='pixz -dc -p ${JOBS}'" ;;
+  *.tar.zst | *.tzst) nicely "curl -fsSL '${tarball_url}' | tar -xf - --posix -C '${dest_dir}' ${tar_params[*]} --use-compress-program='pzstd -dc -p ${JOBS}'" ;;
+  *.tar.bz2 | *.tbz | *.tb2) nicely "curl -fsSL '${tarball_url}' | tar -xf - --posix -C '${dest_dir}' ${tar_params[*]} --use-compress-program='pbzip2 -dc -p ${JOBS}'" ;;
   *)
     echo "Unsupported file format" >&2
     return 1

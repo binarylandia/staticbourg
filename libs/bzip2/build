@@ -25,7 +25,7 @@ pushd "${build_dir}" >/dev/null
   src_dir=$(abspath "${NAME}-${VERSION}")
 
   if [ ! -d "${src_dir}" ]; then
-    fetch_tarball "${TARBALL_URL}" "${src_dir}"
+    fetch_tarball "${TARBALL_URL}" "${src_dir}" --strip-components=1
   fi
 
   pushd "${src_dir}" >/dev/null
