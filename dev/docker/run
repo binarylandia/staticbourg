@@ -6,7 +6,7 @@ trap "exit" INT
 source "${BASH_SOURCE%/*}/../lib/utils.sh"
 
 CROSS_COMPILE="${CROSS_COMPILE:?}"
-PROJECT_DOCKER_REPO="binarylandia/libdorf"
+PROJECT_DOCKER_REPO="binarylandia/staticbourg"
 
 USER="user"
 GROUP="user"

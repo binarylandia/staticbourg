@@ -48,7 +48,7 @@ function run_one() {
     while IFS= read -r build_script; do
       local name=$(basename "$(dirname "${build_script}")")
       build_one_name "${name}"
-    done < <(find "$(here)/libs" -maxdepth 2 -name "build")
+    done < <(find "$(here)/tasks" -maxdepth 2 -name "build")
   fi
 }
 export -f run_one

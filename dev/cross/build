@@ -75,7 +75,7 @@ function build() {
   declare -x FCFLAGS="${FCFLAGS:-} ${common_flags} ${fcflags}"
   declare -x LDFLAGS="${LDFLAGS:-} ${common_flags} ${ldflags}"
 
-  nicely "$(project_root)/libs/${name}/build"
+  nicely "$(project_root)/tasks/${name}/build"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
