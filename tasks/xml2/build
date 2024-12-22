@@ -57,8 +57,9 @@ pushd "${build_dir}" >/dev/null
     mv "${install_dir}/include/libxml2/libxml" "${install_dir}/include/libxml"
     rm -rf "${install_dir}/include/libxml2"
 
-    sed -i "s|prefix=${install_dir}|prefix=\$\{pcfiledir\}/../..|g" "${install_dir}/lib/pkgconfig/libxml-2.0.pc"
-    sed -i'' 's|-I${includedir}/libxml2|-I${includedir}|' "${install_dir}/lib/pkgconfig/libxml-2.0.pc"
+    sed -i'' "s|prefix=${install_dir}|prefix=\$\{pcfiledir\}/../..|g" "${install_dir}/lib/pkgconfig/libxml-2.0.pc"
+    sed -i'' 's|-I${includedir}/libxml2|-I${includedir}|g' "${install_dir}/lib/pkgconfig/libxml-2.0.pc"
+    sed -i'' 's|^prefix=.*|prefix="$(cd "$(dirname "$0")/../" \&\& pwd)"|' "${install_dir}/bin/xml2-config"
 
     find "${install_dir}/lib/cmake" -type f \
       -exec sed -i'' 's|set(LIBXML2_INCLUDE_DIR    ${PACKAGE_PREFIX_DIR}/include/libxml2)|set(LIBXML2_INCLUDE_DIR    ${PACKAGE_PREFIX_DIR}/include)|g; s|INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include/libxml2"|INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"|g' {} +
