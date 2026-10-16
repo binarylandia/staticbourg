@@ -121,7 +121,9 @@ export -f get_bin_dir
 
 function guess_ext() {
   local target="${1:-}"
-  [[ "$target" =~ (mingw|windows) ]] && echo ".exe"
+  if [[ "$target" =~ (mingw|windows) ]]; then
+    echo ".exe"
+  fi
 }
 export -f guess_ext
 
@@ -162,7 +164,7 @@ function package_xz() {
   local input_dir="${1}"
   local output_basename="${2}"
   mkdir -p "$(dirname "${output_basename}")"
-  nicely "find '${input_dir}' -printf '%P\\n' | tar --posix -cf '${output_basename}.tar.xz' -C '${input_dir}' --files-from=- --use-compress-program='pixz -p $(nproc) -5'"
+  nicely "find '${input_dir}' -printf '%P\\n' | tar --posix --no-recursion -cf '${output_basename}.tar.xz' -C '${input_dir}' --files-from=- --use-compress-program='pixz -p $(nproc) -5'"
 }
 export -f package_xz
 
@@ -170,7 +172,7 @@ function package_gz() {
   local input_dir="${1}"
   local output_basename="${2}"
   mkdir -p "$(dirname "${output_basename}")"
-  nicely "find '${input_dir}' -printf '%P\\n' | tar --posix -cf '${output_basename}.tar.gz' -C '${input_dir}' --files-from=- --use-compress-program='pigz -p $(nproc) -7'"
+  nicely "find '${input_dir}' -printf '%P\\n' | tar --posix --no-recursion -cf '${output_basename}.tar.gz' -C '${input_dir}' --files-from=- --use-compress-program='pigz -p $(nproc) -7'"
 }
 export -f package_gz
 
@@ -178,7 +180,7 @@ function package_zst() {
   local input_dir="${1}"
   local output_basename="${2}"
   mkdir -p "$(dirname "${output_basename}")"
-  nicely "find '${input_dir}' -printf '%P\\n' | tar --posix -cf '${output_basename}.tar.zst' -C '${input_dir}' --files-from=- --use-compress-program='zstdmt -q -T$(nproc) -7'"
+  nicely "find '${input_dir}' -printf '%P\\n' | tar --posix --no-recursion -cf '${output_basename}.tar.zst' -C '${input_dir}' --files-from=- --use-compress-program='zstdmt -q -T$(nproc) -7'"
 }
 export -f package_zst
 
