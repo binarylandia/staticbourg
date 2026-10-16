@@ -61,6 +61,11 @@ x86_64-pc-windows-gnu)
   CROSS_GCC_TRIPLET="x86_64-w64-mingw32"
   CROSS_RUNNER="/usr/lib/wine/wine64"
   ;;
+wasm32-unknown-emscripten)
+  dockerfile="$(project_root)/dev/docker/wasm-emscripten.dockerfile"
+  CROSS_COMPILE_UPPER="WASM32_UNKNOWN_EMSCRIPTEN"
+  CROSS_RUNNER="node"
+  ;;
 native)
   dockerfile="$(project_root)/dev/docker/native.dockerfile"
   ;;

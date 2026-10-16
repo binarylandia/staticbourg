@@ -214,6 +214,62 @@ function fetch_tarball() {
 }
 export -f fetch_tarball
 
+# Download a source tarball, verify it against its sha256 in a checksums file
+# (lines of "<sha256>  <file name>", keyed by the file name of the URL), and
+# unpack it into a directory without its top-level folder. A missing or
+# different checksum fails.
+function fetch_verified_tarball() {
+  local url="${1:?url}"
+  local checksums="${2:?checksums file}"
+  local dest_dir="${3:?destination}"
+  local name="${url##*/}"
+  local expected actual tmp
+  expected="$(awk -v name="${name}" '$2 == name { print $1 }' "${checksums}")"
+  if [[ -z "${expected}" ]]; then
+    err "No checksum recorded for ${name} in ${checksums}"
+    return 1
+  fi
+  tmp="$(mktemp)"
+  curl -fsSL --retry 3 -o "${tmp}" "${url}"
+  actual="$(sha256sum "${tmp}" | cut -d' ' -f1)"
+  if [[ "${actual}" != "${expected}" ]]; then
+    rm -f "${tmp}"
+    err "Checksum mismatch for ${url}: expected ${expected}, got ${actual}"
+    return 1
+  fi
+  rm -rf "${dest_dir}"
+  mkdir -p "${dest_dir}"
+  tar -xf "${tmp}" -C "${dest_dir}" --strip-components=1
+  rm -f "${tmp}"
+}
+export -f fetch_verified_tarball
+
+# Name of a target in package names. Emscripten gives no ABI guarantee between
+# versions, so a WebAssembly library links only with the Emscripten version that
+# built it, and its package name carries that version
+# (wasm32-unknown-emscripten.6.0.10).
+function package_target_name() {
+  local target="${1:?target}"
+  if [[ "${target}" == wasm32-*-emscripten ]]; then
+    local version
+    version="$(<"${EMSCRIPTEN_DIR:?}/emscripten/emscripten-version.txt")"
+    printf '%s.%s\n' "${target}" "${version%-git}"
+  else
+    printf '%s\n' "${target}"
+  fi
+}
+export -f package_target_name
+
+# Record the Emscripten version in a WebAssembly package, so a consumer can
+# check it against the Emscripten it links with.
+function install_target_info() {
+  local install_dir="${1:?install dir}"
+  if [[ "${CROSS_COMPILE:?}" == wasm32-*-emscripten ]]; then
+    install -D -m 0644 "${EMSCRIPTEN_DIR:?}/emscripten/emscripten-version.txt" "${install_dir}/share/emscripten-version.txt"
+  fi
+}
+export -f install_target_info
+
 function getenv_cross() {
   local varname="${1:?}"
   local target="${2:-${CROSS_COMPILE:?}}"

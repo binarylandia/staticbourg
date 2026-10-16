@@ -5,6 +5,8 @@ trap "exit" INT
 # shellcheck source=./../lib/utils.sh
 source "${BASH_SOURCE%/*}/../lib/utils.sh"
 
+# The targets of a plain run. wasm32-unknown-emscripten builds only on request
+# (--target=wasm32-unknown-emscripten), because only some tasks support it.
 export targets=(
   "x86_64-unknown-linux-gnu"
   "x86_64-unknown-linux-musl"
@@ -57,9 +59,11 @@ function run_serial() {
   set -euxo pipefail
   trap "exit" INT
 
-  local target
+  local target name
   for target in "${targets[@]}"; do
-    run_one "${target}" "${*}"
+    for name in "${@:-all}"; do
+      run_one "${target}" "${name}"
+    done
   done
 }
 export -f run_serial
@@ -112,9 +116,12 @@ function run_in_tmux_split() {
 }
 
 function main() {
-  local arg args
+  local arg args selected=()
   for arg in "$@"; do
     case ${arg} in
+    --target=*)
+      selected+=("${arg#--target=}")
+      ;;
     --split)
       local split=1
       ;;
@@ -129,6 +136,10 @@ function main() {
       ;;
     esac
   done
+
+  if ((${#selected[@]} > 0)); then
+    targets=("${selected[@]}")
+  fi
 
   if [ -n "${split:-}" ]; then
     run_in_tmux_split "${args[@]}"

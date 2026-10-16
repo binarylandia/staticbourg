@@ -41,7 +41,7 @@ function build() {
   declare -x CMAKE_C_COMPILER_LAUNCHER="ccache"
   declare -x CMAKE_CXX_COMPILER_LAUNCHER="ccache"
 
-  local c_arch
+  local c_arch=""
   case "${CROSS_COMPILE}" in
   aarch64-apple* | aarch64-darwin*)
     c_arch="-mcpu=apple-m1"
@@ -64,11 +64,22 @@ function build() {
     static_flags="" #"-static -static-libgcc -static-libgfortran -static-libstdc++"
   fi
 
+  local ldflags="-s"
+
+  # emcc brings its own sysroot and links one static WebAssembly module: no
+  # position-independent code, and `-s` would start an emcc setting instead of
+  # stripping. ccache does not recognize emcc as a compiler.
+  if [[ "${CROSS_COMPILE}" == wasm32-* ]]; then
+    opt_flags="-g0 -O3"
+    sysroot=""
+    ldflags=""
+    unset CMAKE_C_COMPILER_LAUNCHER CMAKE_CXX_COMPILER_LAUNCHER
+  fi
+
   local common_flags="-w ${opt_flags} ${static_flags} ${c_arch} ${sysroot}"
   local cflags=""
   local cxxflags=""
   local fcflags=""
-  local ldflags="-s"
 
   declare -x CFLAGS="${CFLAGS:-} ${common_flags} ${cflags}"
   declare -x CXXFLAGS="${CXXFLAGS:-} ${common_flags} ${cxxflags}"
