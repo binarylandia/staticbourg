@@ -12,7 +12,7 @@ function build() {
   declare -x CROSS_COMPILE="${2:-${CROSS_COMPILE:?}}"
   declare -x BUILD_TIME="${BUILD_TIME:-"$(datetime_safe)"}"
   declare -x BUILD_DIR="${BUILD_DIR:-"$(project_root)/.build/${CROSS_COMPILE}"}"
-  declare -x INSTALL_DIR="${INSTALL_DIR:-"$(project_root)/.install/${CROSS_COMPILE}/${BUILD_TIME}"}"
+  declare -x INSTALL_DIR="${INSTALL_DIR:-"$(project_root)/.install/${CROSS_COMPILE}/${BUILD_TIME}/${name}"}"
   declare -x OUT_DIR="${OUT_DIR:-"$(project_root)/.out/${BUILD_TIME}"}"
 
   declare -x SYSROOT="${CROSS_SYSROOT:?}"
