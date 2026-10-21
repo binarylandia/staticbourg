@@ -41,16 +41,23 @@ function build() {
   declare -x CMAKE_C_COMPILER_LAUNCHER="ccache"
   declare -x CMAKE_CXX_COMPILER_LAUNCHER="ccache"
 
+  # The CPU baseline of the consumers' builds, which link these archives: a
+  # library above it stops the consumer with an illegal instruction on an older
+  # CPU that the consumer itself supports.
+  # - x86_64: x86-64-v2 (SSE4.2, POPCNT, CMPXCHG16B)
+  # - aarch64 Linux: Armv8.0, with atomics through the outline atomics helpers,
+  #   which use LSE instructions when the CPU has them
+  # - aarch64 macOS: Apple M1, the first Apple CPU with an arm64 Mac
   local c_arch=""
   case "${CROSS_COMPILE}" in
   aarch64-apple* | aarch64-darwin*)
     c_arch="-mcpu=apple-m1"
     ;;
   aarch64*)
-    c_arch="-march=armv8.2-a"
+    c_arch="-march=armv8-a -moutline-atomics"
     ;;
   x86_64*)
-    c_arch="-march=haswell"
+    c_arch="-march=x86-64-v2"
     ;;
   esac
 

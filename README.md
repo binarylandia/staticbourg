@@ -22,7 +22,7 @@ Cross-compiles common C libraries as static archives for Linux, macOS, and Windo
 
 - Static libraries with -fPIC for flexible linking
 - Optimized builds (-O3, vectorization, loop unrolling)
-- Architecture-tuned (Haswell for x86_64, ARMv8.2-a for aarch64 Linux, Apple M1 for aarch64 macOS)
+- CPU baseline x86-64-v2 for x86_64, ARMv8.0-A with outline atomics for aarch64 Linux, Apple M1 for aarch64 macOS, so the archives run on every CPU that their consumers support
 - Multiple compression formats (xz, gzip, zstd)
 - WebAssembly archives of lzma and zstd for Emscripten, built with `emcc` and without threads. Emscripten has no ABI guarantee between versions, so these archives link only with the Emscripten version in their name (`wasm32-unknown-emscripten.6.0.10`), which `share/emscripten-version.txt` also records
 
