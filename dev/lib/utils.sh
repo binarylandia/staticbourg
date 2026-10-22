@@ -294,7 +294,9 @@ export -f install_target_info
 #   llvm: the binarylandia/build_llvm release of the image (native only)
 #   target_toolchain: {url, sha256} of the toolchain archive of the target (GCC,
 #     osxcross, llvm-mingw, or Emscripten)
-#   cflags, cpu_flags: all C flags, and the CPU flags among them (native only)
+#   cflags: the C flags that the task passes to the build of the library
+#     (CFLAGS when it packages the library), which its build system can extend
+#   cpu_flags: the CPU baseline flags among them (native only)
 #   macosx_deployment_target, win32_winnt: macOS and msvcrt Windows only
 #   emscripten: the Emscripten version (wasm only)
 #   dockerfile, dockerfile_sha256: the image file of the build and its sha256
@@ -321,8 +323,10 @@ function package_with_record() {
     --arg source "${source}" \
     --arg source_sha256 "${source_sha256}" \
     --argjson toolchain "${BUILD_RECORD:?}" \
+    --arg cflags "${CFLAGS:?}" \
     '{name: $name, library: $library, version: $version, source: $source, source_sha256: $source_sha256}
       + $toolchain
+      + {cflags: $cflags}
       + {files: ["tar.xz", "tar.gz", "tar.zst"] | map("\($name).\(.)")}' \
     >"${record}"
 
@@ -332,7 +336,7 @@ function package_with_record() {
 export -f package_with_record
 
 # Print the toolchain fields of the build records of a build as JSON (see
-# package_with_record), from the compiler and flags of the build, the download
+# package_with_record), from the compiler and CPU flags of the build, the download
 # records of the image (TOOLCHAIN_RECORD_LLVM, TOOLCHAIN_RECORD_TARGET, written
 # by the installers in dev/docker/files), and the provenance that
 # dev/docker/run passes in.
@@ -369,7 +373,6 @@ function toolchain_record() {
     --arg compiler "${compiler}" \
     --argjson llvm "${llvm}" \
     --argjson target_toolchain "${target_toolchain}" \
-    --arg cflags "${CFLAGS:-}" \
     --arg cpu_flags "${cpu_flags}" \
     --arg macosx_deployment_target "${MACOSX_DEPLOYMENT_TARGET:-}" \
     --arg win32_winnt "${win32_winnt}" \
@@ -385,7 +388,6 @@ function toolchain_record() {
       compiler: $compiler,
       llvm: (if $llvm then $llvm.url | split("/") | .[-2] else null end),
       target_toolchain: $target_toolchain,
-      cflags: $cflags,
       cpu_flags: $cpu_flags,
       macosx_deployment_target: $macosx_deployment_target,
       win32_winnt: $win32_winnt,

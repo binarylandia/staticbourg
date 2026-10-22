@@ -89,8 +89,8 @@ native)
   ;;
 esac
 
-# Provenance for the build records of the archives (see write_build_record in
-# dev/lib/utils.sh): the image file, and the commit of the checkout with a flag
+# Provenance for the build records of the archives (see package_with_record
+# in dev/lib/utils.sh): the image file, and the commit of the checkout with a flag
 # for uncommitted or untracked files. The container cannot run git, because the
 # git directory of a worktree lies outside the mounted checkout.
 build_commit="$(git -C "$(project_root)" rev-parse HEAD)"

@@ -32,9 +32,11 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 
 pushd "${src_dir}" >/dev/null
 {
-  export CC="ccache ${CC} ${CFLAGS} -D_FILE_OFFSET_BITS=64"
+  # CFLAGS on the make command line replaces the flags of the Makefile (-O2 -g).
+  # -D_FILE_OFFSET_BITS=64 keeps the large file support that they enable.
+  export CFLAGS="${CFLAGS} -D_FILE_OFFSET_BITS=64"
 
-  make CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" LDFLAGS="${LDFLAGS}" PREFIX="${install_dir}" \
+  make CC="ccache ${CC}" CFLAGS="${CFLAGS}" AR="${AR}" RANLIB="${RANLIB}" LDFLAGS="${LDFLAGS}" PREFIX="${install_dir}" \
     "libbz2.a" -j"${JOBS}" 2>&1 | log "${build_dir}/build.log"
 
   nicely mkdir -p "${install_dir}/"{include,lib/pkgconfig}

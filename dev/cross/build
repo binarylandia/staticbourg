@@ -88,6 +88,8 @@ function build() {
   declare -x LDFLAGS
   LDFLAGS="$(join_words "${LDFLAGS:-} ${common_flags} ${ldflags}")"
 
+  # The task adds the C flags to the record when it packages the library,
+  # because it can add flags of its own.
   declare -x BUILD_RECORD
   BUILD_RECORD="$(toolchain_record "${cpu_flags}" "${win32_winnt}")"
 

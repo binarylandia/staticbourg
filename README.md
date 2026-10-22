@@ -59,7 +59,8 @@ Each archive contains `share/staticbourg/build.json`, and the release carries th
 - `target`, `compiler`: the target, and the first line of `$CC --version`
 - `llvm`: the `binarylandia/build_llvm` release of the build image (native targets)
 - `target_toolchain`: `url` and `sha256` of the GCC, osxcross, llvm-mingw, or Emscripten archive of the target
-- `cflags`, `cpu_flags`: all C flags, and the CPU flags among them (native targets)
+- `cflags`: the C flags that the task passes to the build of the library, which the build system of the library can extend
+- `cpu_flags`: the CPU baseline flags among them (native targets)
 - `macosx_deployment_target`, `win32_winnt`: the macOS deployment target, and the `_WIN32_WINNT` value of `x86_64-pc-windows-gnu`
 - `emscripten`: the Emscripten version (wasm)
 - `dockerfile`, `dockerfile_sha256`, `build_commit`, `build_dirty`, `build_time`: the build image file, the commit of this repository, whether the checkout had uncommitted or untracked files, and the build time
