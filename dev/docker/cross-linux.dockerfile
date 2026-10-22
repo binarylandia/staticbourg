@@ -40,6 +40,7 @@ RUN set -euxo pipefail >/dev/null \
   file \
   git \
   gzip \
+  jq \
   "libc6:${CROSS_ARCH_DEBIAN}" \
   libtool \
   make \
@@ -84,6 +85,8 @@ fi \
 
 ENV PATH="${LLVM_DIR}/bin:${PATH}"
 ENV CROSS_SYSROOT="${CROSS_GCC_DIR}/${CROSS_COMPILE}/sysroot"
+ENV TOOLCHAIN_RECORD_LLVM="${LLVM_DIR}/llvm.json"
+ENV TOOLCHAIN_RECORD_TARGET="${CROSS_GCC_DIR}/toolchain.json"
 
 ENV CC_${CROSS_COMPILE}="${LLVM_DIR}/bin/${CROSS_COMPILE}-clang"
 ENV CXX_${CROSS_COMPILE}="${LLVM_DIR}/bin/${CROSS_COMPILE}-clang++"

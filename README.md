@@ -16,6 +16,17 @@ WebAssembly (`lzma` and `zstd` only):
 
 `--target=<triple>` selects targets, and `--serial` builds one target at a time. The archives go to `.out/<build time>/`; set `BUILD_TIME` to give several runs one build time.
 
+## Release
+
+One build of every task and target with one `BUILD_TIME`, then:
+
+```bash
+./dev/release --dry-run <build time>
+./dev/release <build time>
+```
+
+`dev/release` checks that every archive comes from a clean build of the pushed `HEAD`, and publishes the release `<build time>` with the archives, `SHA256SUMS`, and `manifest.json`.
+
 ## What is this?
 
 Cross-compiles common C libraries as static archives for Linux, macOS, and Windows. All libraries built with position-independent code (-fPIC) for embedding into applications or shared libraries.
@@ -38,6 +49,21 @@ The toolchains are binarylandia releases, the same as in the [TreeTime](https://
 | `wasm32-unknown-emscripten` | Emscripten 6.0.10 | | | |
 
 The toolchain archives are pinned with their sha256 in `dev/docker/files/`. The x86_64 and arm64 Linux baselines let the archives run on every CPU that their consumers support: x86-64-v2 has no AVX, and Armv8.0 runs on Cortex-A53 and Cortex-A72 cores, with LSE atomics through the outline atomics helpers where the CPU has them. Windows on Arm requires LSE, and the Windows targets have no outline atomics helpers.
+
+## Build records
+
+Each archive contains `share/staticbourg/build.json`, and the release carries the same record per archive in `manifest.json`:
+
+- `name`, `library`, `version`, `source`, `source_sha256`: the archive, and the library with its source tarball
+- `kind`: `native`, or `wasm`
+- `target`, `compiler`: the target, and the first line of `$CC --version`
+- `llvm`: the `binarylandia/build_llvm` release of the build image (native targets)
+- `target_toolchain`: `url` and `sha256` of the GCC, osxcross, llvm-mingw, or Emscripten archive of the target
+- `cflags`, `cpu_flags`: all C flags, and the CPU flags among them (native targets)
+- `macosx_deployment_target`, `win32_winnt`: the macOS deployment target, and the `_WIN32_WINNT` value of `x86_64-pc-windows-gnu`
+- `emscripten`: the Emscripten version (wasm)
+- `dockerfile`, `dockerfile_sha256`, `build_commit`, `build_dirty`, `build_time`: the build image file, the commit of this repository, whether the checkout had uncommitted or untracked files, and the build time
+- `files`: the archive files
 
 ## Features
 

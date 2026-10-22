@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 #
-# Usage: $0 <url> <output-file>
+# Usage: $0 <url> <output-file> [<record-file>]
 #
 # Download a file and verify it against its sha256 in the checksums file next to
 # this script, keyed by the file name of the URL. A download with no recorded
 # checksum, or with a different one, is removed and fails the build; the error
 # prints the computed checksum to record after reviewing the source.
 #
+# With a record file, also write the URL and the sha256 of the download to it as
+# JSON ({"url": ..., "sha256": ...}). The build records of the archives name the
+# toolchains of the image from these files.
+#
 set -euo pipefail
 
 url="${1:?url}"
 out="${2:?output file}"
+record="${3:-}"
 checksums="$(dirname "${BASH_SOURCE[0]}")/checksums"
 name="${url##*/}"
 
@@ -27,4 +32,9 @@ if [[ "${actual}" != "${expected}" ]]; then
   rm -f "${out}"
   printf 'Checksum mismatch for %s: expected %s, got %s\n' "${url}" "${expected}" "${actual}" >&2
   exit 1
+fi
+
+if [[ -n "${record}" ]]; then
+  mkdir -p "$(dirname "${record}")"
+  jq -n --arg url "${url}" --arg sha256 "${actual}" '{url: $url, sha256: $sha256}' >"${record}"
 fi

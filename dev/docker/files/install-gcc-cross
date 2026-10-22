@@ -8,6 +8,8 @@
 # libstdc++ of the toolchain (install-clang-target); the MinGW toolchain
 # (x86_64-w64-mingw32, msvcrt) compiles and links with its own GCC.
 #
+# The prefix gets the download record toolchain.json (see /fetch).
+#
 set -euxo pipefail
 
 triplet="${1:?triplet}"
@@ -18,7 +20,7 @@ release="gcc-15.3.0_${version}-${build_time}"
 archive="/tmp/gcc-cross.tar.xz"
 mkdir -p "${dest}"
 
-/fetch "https://github.com/binarylandia/build_crosstool-ng/releases/download/${release}/gcc-${version}-${triplet}-${build_time}.tar.xz" "${archive}"
+/fetch "https://github.com/binarylandia/build_crosstool-ng/releases/download/${release}/gcc-${version}-${triplet}-${build_time}.tar.xz" "${archive}" "${dest}/toolchain.json"
 pixz -dp "$(nproc)" <"${archive}" | tar -C "${dest}" -x
 rm "${archive}"
 

@@ -40,6 +40,7 @@ RUN set -euxo pipefail >/dev/null \
   file \
   git \
   gzip \
+  jq \
   libtool \
   make \
   parallel \
@@ -77,6 +78,8 @@ RUN set -euxo pipefail >/dev/null \
 # The <triple>-clang drivers name the sysroot in their configuration files, so
 # the builds pass no --sysroot (CROSS_SYSROOT stays unset).
 ENV PATH="${LLVM_DIR}/bin:${PATH}"
+ENV TOOLCHAIN_RECORD_LLVM="${LLVM_DIR}/llvm.json"
+ENV TOOLCHAIN_RECORD_TARGET="${LLVM_DIR}/llvm-mingw.json"
 
 ENV CC_${CROSS_COMPILE}="${LLVM_DIR}/bin/${CROSS_MINGW_TRIPLET}-clang"
 ENV CXX_${CROSS_COMPILE}="${LLVM_DIR}/bin/${CROSS_MINGW_TRIPLET}-clang++"

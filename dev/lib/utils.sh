@@ -281,6 +281,124 @@ function install_target_info() {
 }
 export -f install_target_info
 
+# Package an installed library with its build record, as
+# <out dir>/<library>-<version>-static-<target>-<build time>.tar.{xz,gz,zst}.
+# The build record goes into the archives as share/staticbourg/build.json and
+# next to them as <archive name>.json, which dev/release collects into the
+# manifest of a release. It holds the library fields given here and the
+# toolchain fields of BUILD_RECORD (toolchain_record):
+#   name, library, version, source, source_sha256: the archive name without the
+#     extension, and the library with its source tarball
+#   kind: "native", or "wasm" for WebAssembly
+#   target, compiler: the target, and the first line of `$CC --version`
+#   llvm: the binarylandia/build_llvm release of the image (native only)
+#   target_toolchain: {url, sha256} of the toolchain archive of the target (GCC,
+#     osxcross, llvm-mingw, or Emscripten)
+#   cflags, cpu_flags: all C flags, and the CPU flags among them (native only)
+#   macosx_deployment_target, win32_winnt: macOS and msvcrt Windows only
+#   emscripten: the Emscripten version (wasm only)
+#   dockerfile, dockerfile_sha256: the image file of the build and its sha256
+#   build_commit, build_dirty, build_time: the commit of the checkout, whether
+#     the checkout had uncommitted or untracked files, and the build time
+#   files: the archive files
+function package_with_record() {
+  local install_dir="${1:?install dir}"
+  local out_dir="${2:?out dir}"
+  local library="${3:?library}"
+  local version="${4:?version}"
+  local source="${5:?source url}"
+  local source_sha256="${6:?source sha256}"
+  local name
+  name="${library}-${version}-static-$(package_target_name "${CROSS_COMPILE:?}")-${BUILD_TIME:?}"
+
+  install_target_info "${install_dir}"
+  local record="${install_dir}/share/staticbourg/build.json"
+  mkdir -p "$(dirname "${record}")" "${out_dir}"
+  jq -n \
+    --arg name "${name}" \
+    --arg library "${library}" \
+    --arg version "${version}" \
+    --arg source "${source}" \
+    --arg source_sha256 "${source_sha256}" \
+    --argjson toolchain "${BUILD_RECORD:?}" \
+    '{name: $name, library: $library, version: $version, source: $source, source_sha256: $source_sha256}
+      + $toolchain
+      + {files: ["tar.xz", "tar.gz", "tar.zst"] | map("\($name).\(.)")}' \
+    >"${record}"
+
+  package_all "${install_dir}" "${out_dir}/${name}"
+  cp "${record}" "${out_dir}/${name}.json"
+}
+export -f package_with_record
+
+# Print the toolchain fields of the build records of a build as JSON (see
+# package_with_record), from the compiler and flags of the build, the download
+# records of the image (TOOLCHAIN_RECORD_LLVM, TOOLCHAIN_RECORD_TARGET, written
+# by the installers in dev/docker/files), and the provenance that
+# dev/docker/run passes in.
+function toolchain_record() {
+  local cpu_flags="${1:-}"
+  local win32_winnt="${2:-}"
+  local compiler
+  compiler="$(${CC:?} --version)"
+  compiler="${compiler%%$'\n'*}"
+
+  local kind="native"
+  local emscripten=""
+  if [[ "${CROSS_COMPILE:?}" == wasm32-*-emscripten ]]; then
+    kind="wasm"
+    emscripten="$(<"${EMSCRIPTEN_DIR:?}/emscripten/emscripten-version.txt")"
+    emscripten="${emscripten%-git}"
+    cpu_flags=""
+  fi
+
+  local llvm="null"
+  if [[ -n "${TOOLCHAIN_RECORD_LLVM:-}" ]]; then
+    llvm="$(<"${TOOLCHAIN_RECORD_LLVM}")"
+  fi
+  local target_toolchain="null"
+  if [[ -n "${TOOLCHAIN_RECORD_TARGET:-}" ]]; then
+    target_toolchain="$(<"${TOOLCHAIN_RECORD_TARGET}")"
+  fi
+
+  # A GitHub release download URL is
+  # https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>.
+  jq -n \
+    --arg kind "${kind}" \
+    --arg target "${CROSS_COMPILE}" \
+    --arg compiler "${compiler}" \
+    --argjson llvm "${llvm}" \
+    --argjson target_toolchain "${target_toolchain}" \
+    --arg cflags "${CFLAGS:-}" \
+    --arg cpu_flags "${cpu_flags}" \
+    --arg macosx_deployment_target "${MACOSX_DEPLOYMENT_TARGET:-}" \
+    --arg win32_winnt "${win32_winnt}" \
+    --arg emscripten "${emscripten}" \
+    --arg dockerfile "${DOCKERFILE:?}" \
+    --arg dockerfile_sha256 "${DOCKERFILE_SHA256:?}" \
+    --arg build_commit "${BUILD_COMMIT:?}" \
+    --arg build_dirty "${BUILD_DIRTY:?}" \
+    --arg build_time "${BUILD_TIME:?}" \
+    '{
+      kind: $kind,
+      target: $target,
+      compiler: $compiler,
+      llvm: (if $llvm then $llvm.url | split("/") | .[-2] else null end),
+      target_toolchain: $target_toolchain,
+      cflags: $cflags,
+      cpu_flags: $cpu_flags,
+      macosx_deployment_target: $macosx_deployment_target,
+      win32_winnt: $win32_winnt,
+      emscripten: $emscripten,
+      dockerfile: $dockerfile,
+      dockerfile_sha256: $dockerfile_sha256,
+      build_commit: $build_commit,
+      build_dirty: ($build_dirty == "true"),
+      build_time: $build_time
+    } | with_entries(select(.value != null and .value != ""))'
+}
+export -f toolchain_record
+
 # Print the words of a string separated by single spaces.
 function join_words() {
   local words

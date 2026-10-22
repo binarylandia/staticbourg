@@ -89,6 +89,17 @@ native)
   ;;
 esac
 
+# Provenance for the build records of the archives (see write_build_record in
+# dev/lib/utils.sh): the image file, and the commit of the checkout with a flag
+# for uncommitted or untracked files. The container cannot run git, because the
+# git directory of a worktree lies outside the mounted checkout.
+build_commit="$(git -C "$(project_root)" rev-parse HEAD)"
+build_dirty="false"
+if [ -n "$(git -C "$(project_root)" status --porcelain)" ]; then
+  build_dirty="true"
+fi
+dockerfile_sha256="$(sha256sum "$(project_root)/${dockerfile}" | cut -d' ' -f1)"
+
 # shellcheck disable=SC2046
 docker_file_hash="$(
   file_hash \
@@ -142,6 +153,10 @@ docker run --rm $(tty -s && echo "-it") \
   --env="GROUP=${GROUP}" \
   --env="BUILD_TIME=${BUILD_TIME:-}" \
   --env="CROSS_COMPILE=${CROSS_COMPILE:-}" \
+  --env="BUILD_COMMIT=${build_commit}" \
+  --env="BUILD_DIRTY=${build_dirty}" \
+  --env="DOCKERFILE=${dockerfile}" \
+  --env="DOCKERFILE_SHA256=${dockerfile_sha256}" \
   --env="PS1=\${USER}@\${HOST}" \
   --env="TERM=xterm-256color" \
   --env="TZ=Etc/UTC" \

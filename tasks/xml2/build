@@ -66,7 +66,6 @@ pushd "${src_dir}" >/dev/null
   find "${install_dir}/lib/cmake" -type f \
     -exec sed -i'' 's|set(LIBXML2_INCLUDE_DIR    ${PACKAGE_PREFIX_DIR}/include/libxml2)|set(LIBXML2_INCLUDE_DIR    ${PACKAGE_PREFIX_DIR}/include)|g; s|INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include/libxml2"|INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"|g' {} +
 
-  install_target_info "${install_dir}"
-  package_all "${install_dir}" "${out_dir}/${NAME}-${VERSION}-static-$(package_target_name "${CROSS_COMPILE}")-${BUILD_TIME}"
+  package_with_record "${install_dir}" "${out_dir}" "${NAME}" "${VERSION}" "${SOURCE_URL}" "$(recorded_sha256 "${SOURCE_URL}" "${task_dir}/checksums")"
 }
 popd >/dev/null

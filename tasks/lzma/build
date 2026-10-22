@@ -70,7 +70,6 @@ pushd "${src_dir}" >/dev/null
   sed -i "s|libdir=.*|libdir=\$\{exec_prefix\}/lib|g" "${install_dir}/lib/pkgconfig/liblzma.pc"
   sed -i "s|includedir=.*|includedir=\$\{exec_prefix\}/include|g" "${install_dir}/lib/pkgconfig/liblzma.pc"
 
-  install_target_info "${install_dir}"
-  package_all "${install_dir}" "${out_dir}/${NAME}-${VERSION}-static-$(package_target_name "${CROSS_COMPILE}")-${BUILD_TIME}"
+  package_with_record "${install_dir}" "${out_dir}" "${NAME}" "${VERSION}" "${SOURCE_URL}" "$(recorded_sha256 "${SOURCE_URL}" "${task_dir}/checksums")"
 }
 popd >/dev/null

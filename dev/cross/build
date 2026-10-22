@@ -88,6 +88,9 @@ function build() {
   declare -x LDFLAGS
   LDFLAGS="$(join_words "${LDFLAGS:-} ${common_flags} ${ldflags}")"
 
+  declare -x BUILD_RECORD
+  BUILD_RECORD="$(toolchain_record "${cpu_flags}" "${win32_winnt}")"
+
   nicely "$(project_root)/tasks/${name}/build"
 }
 

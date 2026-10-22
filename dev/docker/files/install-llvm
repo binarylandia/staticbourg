@@ -9,6 +9,9 @@
 # which load the sysroot, compiler-rt, libunwind, and lld from the
 # <triple>.cfg files next to them.
 #
+# The prefix gets the download records llvm.json and, with --mingw,
+# llvm-mingw.json (see /fetch).
+#
 set -euxo pipefail
 
 dest="${1:?prefix}"
@@ -19,17 +22,17 @@ release="llvm-${version}-${build_time}"
 mkdir -p "${dest}"
 
 install_archive() {
-  local name="${1}" archive="/tmp/${1}"
-  /fetch "https://github.com/binarylandia/build_llvm/releases/download/${release}/${name}" "${archive}"
+  local name="${1}" record="${2}" archive="/tmp/${1}"
+  /fetch "https://github.com/binarylandia/build_llvm/releases/download/${release}/${name}" "${archive}" "${record}"
   zstd -dc -T0 "${archive}" | tar -C "${dest}" -x
   rm "${archive}"
 }
 
-install_archive "${release}.tar.zst"
+install_archive "${release}.tar.zst" "${dest}/llvm.json"
 "${dest}/bin/clang" --version
 
 if [[ "${mingw}" == "--mingw" ]]; then
-  install_archive "llvm-mingw-${version}-${build_time}.tar.zst"
+  install_archive "llvm-mingw-${version}-${build_time}.tar.zst" "${dest}/llvm-mingw.json"
   for triple in x86_64-w64-mingw32 aarch64-w64-mingw32; do
     "${dest}/bin/${triple}-clang" --version
   done

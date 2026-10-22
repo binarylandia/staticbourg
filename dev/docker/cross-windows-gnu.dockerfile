@@ -39,6 +39,7 @@ RUN set -euxo pipefail >/dev/null \
   file \
   git \
   gzip \
+  jq \
   libtool \
   make \
   parallel \
@@ -78,6 +79,8 @@ RUN set -euxo pipefail >/dev/null \
 # The GCC driver uses the sysroot that it was configured with, so the builds pass
 # no --sysroot (CROSS_SYSROOT stays unset).
 ENV PATH="${LLVM_DIR}/bin:${CROSS_GCC_DIR}/bin:${PATH}"
+ENV TOOLCHAIN_RECORD_LLVM="${LLVM_DIR}/llvm.json"
+ENV TOOLCHAIN_RECORD_TARGET="${CROSS_GCC_DIR}/toolchain.json"
 
 ENV CC_${CROSS_COMPILE}="${CROSS_GCC_DIR}/bin/${CROSS_MINGW_TRIPLET}-gcc"
 ENV CXX_${CROSS_COMPILE}="${CROSS_GCC_DIR}/bin/${CROSS_MINGW_TRIPLET}-g++"

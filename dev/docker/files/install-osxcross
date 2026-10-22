@@ -9,6 +9,8 @@
 # the archive goes into the resource directory of that clang, where clang finds
 # libclang_rt.osx.a for every macOS link.
 #
+# The prefix gets the download record toolchain.json (see /fetch).
+#
 set -euxo pipefail
 
 dest="${1:?prefix}"
@@ -18,7 +20,7 @@ release="osxcross-27d21e4-sdk11.1-${build_time}"
 archive="/tmp/osxcross.tar.zst"
 mkdir -p "${dest}"
 
-/fetch "https://github.com/binarylandia/build_osxcross/releases/download/${release}/osxcross-27d21e4-${build_time}.tar.zst" "${archive}"
+/fetch "https://github.com/binarylandia/build_osxcross/releases/download/${release}/osxcross-27d21e4-${build_time}.tar.zst" "${archive}" "${dest}/toolchain.json"
 zstd -dc -T0 "${archive}" | tar -C "${dest}" -x
 rm "${archive}"
 

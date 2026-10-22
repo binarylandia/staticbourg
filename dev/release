@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+#
+# Usage: $0 [--dry-run] <build time>
+#
+# Publish the archives of .out/<build time>/ as the GitHub release <build time>
+# of binarylandia/staticbourg. Run it on the host that built them, with gh
+# signed in, after one build of every task and target with that BUILD_TIME
+# (dev/cross/all, and dev/cross/all --target=wasm32-unknown-emscripten lzma zstd).
+#
+# The release:
+#   - is named after the build time, for example 2026-10-21_13-40-13, and has no
+#     description
+#   - points at the commit that built the archives, which must be clean and
+#     pushed to origin
+#   - carries the archives
+#     (<library>-<version>-static-<target>-<build time>.tar.{xz,gz,zst}),
+#     SHA256SUMS, and manifest.json with the build record of every archive
+#     (library, version, source and its sha256, target, compiler, the LLVM
+#     release and the target toolchain, C flags, build image file and its
+#     sha256, build commit; see package_with_record in dev/lib/utils.sh)
+#
+# A published release is never changed: the script stops when the release
+# exists. A fixed archive goes into a new release.
+#
+# Options:
+#   --dry-run    Check and write SHA256SUMS and manifest.json, but publish
+#                nothing. A commit that origin lacks is reported, not fatal
+#   -h, --help   Show this help
+#
+# Examples:
+#   $0 --dry-run 2026-10-21_13-40-13
+#   $0 2026-10-21_13-40-13
+#
+set -euo pipefail
+trap "exit" INT
+
+THIS_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+ROOT_DIR="$(realpath "${THIS_DIR}/..")"
+REPO="binarylandia/staticbourg"
+
+function fail() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+# Fail unless HEAD is a clean commit. Fail, or with --dry-run only report, when
+# origin does not have it.
+function check_commit() {
+  local commit="${1}"
+  local dry_run="${2}"
+  if [[ -n "$(git -C "${ROOT_DIR}" status --porcelain)" ]]; then
+    fail "the working tree has uncommitted or untracked files"
+  fi
+  git -C "${ROOT_DIR}" fetch --quiet origin
+  if [[ -z "$(git -C "${ROOT_DIR}" branch --remotes --contains "${commit}")" ]]; then
+    if "${dry_run}"; then
+      printf 'WARNING: commit %s is not pushed to origin; publication would stop here\n' "${commit}" >&2
+    else
+      fail "commit ${commit} is not pushed to origin"
+    fi
+  fi
+}
+
+# Fail unless every build record comes from a clean build of the commit at the
+# build time and names files that exist, and every archive has a build record.
+function check_records() {
+  local out_dir="${1}"
+  local commit="${2}"
+  local build_time="${3}"
+  shift 3
+  local records=("$@")
+  local record
+  for record in "${records[@]}"; do
+    if [[ "$(jq -r '.build_commit' "${record}")" != "${commit}" ]]; then
+      fail "${record} comes from commit $(jq -r '.build_commit' "${record}"), not from HEAD ${commit}"
+    fi
+    if [[ "$(jq -r '.build_dirty' "${record}")" != "false" ]]; then
+      fail "${record} comes from a build with uncommitted or untracked files"
+    fi
+    if [[ "$(jq -r '.build_time' "${record}")" != "${build_time}" ]]; then
+      fail "${record} has the build time $(jq -r '.build_time' "${record}"), not ${build_time}"
+    fi
+    local files=()
+    mapfile -t files < <(jq -r '.files[]' "${record}")
+    local file
+    for file in "${files[@]}"; do
+      [[ -f "${out_dir}/${file}" ]] || fail "${record} names ${file}, which is missing"
+    done
+  done
+
+  local recorded archives
+  recorded="$(jq -r '.files[]' "${records[@]}" | LC_ALL=C sort)"
+  archives="$(find "${out_dir}" -maxdepth 1 -type f -name '*.tar.*' -printf '%f\n' | LC_ALL=C sort)"
+  if [[ "${recorded}" != "${archives}" ]]; then
+    fail "the archives in ${out_dir} differ from those of the build records:
+$(diff <(printf '%s\n' "${recorded}") <(printf '%s\n' "${archives}") || true)"
+  fi
+}
+
+main() {
+  show_help() {
+    sed -n '2,${/^#/!q; s/^# \?//p}' "${BASH_SOURCE[0]}" | sed "s|\$0|${0##*/}|g"
+  }
+
+  local dry_run=false
+
+  while (($# > 0)); do
+    case "${1}" in
+    -h | --help)
+      show_help
+      exit 0
+      ;;
+    --dry-run)
+      dry_run=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      printf "Unknown option: %s\n" "${1}" >&2
+      exit 1
+      ;;
+    *) break ;;
+    esac
+  done
+
+  local build_time="${1:-}"
+  [[ -n "${build_time}" ]] || {
+    show_help >&2
+    exit 1
+  }
+  local out_dir="${ROOT_DIR}/.out/${build_time}"
+  [[ -d "${out_dir}" ]] || fail "${out_dir} does not exist"
+
+  local commit
+  commit="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
+  check_commit "${commit}" "${dry_run}"
+
+  local records=()
+  mapfile -t records < <(find "${out_dir}" -maxdepth 1 -type f -name '*.json' ! -name 'manifest.json' | LC_ALL=C sort)
+  ((${#records[@]} > 0)) || fail "${out_dir} has no build records"
+  check_records "${out_dir}" "${commit}" "${build_time}" "${records[@]}"
+
+  local tag="${build_time}"
+  if gh release view "${tag}" --repo="${REPO}" >/dev/null 2>&1; then
+    fail "release ${tag} exists; a published release is never changed"
+  fi
+
+  local manifest="${out_dir}/manifest.json"
+  jq -s --arg repository "${REPO}" --arg commit "${commit}" --arg build_time "${build_time}" \
+    '{repository: $repository, commit: $commit, build_time: $build_time, archives: (sort_by(.library, .target))}' \
+    "${records[@]}" >"${manifest}"
+
+  local files=()
+  mapfile -t files < <(jq -r '.archives[].files[]' "${manifest}" | LC_ALL=C sort)
+  (cd "${out_dir}" && sha256sum -- "${files[@]}" >SHA256SUMS)
+
+  printf 'Release %s at %s: %d archives\n' "${tag}" "${commit}" "${#files[@]}"
+  jq -r '.archives[] | "  \(.library) \(.version) \(.target): \(.compiler)"' "${manifest}"
+  if "${dry_run}"; then
+    printf '\nDry run: nothing published\n'
+    return
+  fi
+
+  (cd "${out_dir}" && gh release create "${tag}" \
+    --repo="${REPO}" \
+    --target="${commit}" \
+    --title="${tag}" \
+    --notes="" \
+    -- "${files[@]}" SHA256SUMS manifest.json)
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi

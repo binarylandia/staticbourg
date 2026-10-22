@@ -36,6 +36,7 @@ RUN set -euxo pipefail >/dev/null \
   file \
   git \
   gzip \
+  jq \
   libtool \
   make \
   parallel \
@@ -75,6 +76,8 @@ ENV MACOSX_DEPLOYMENT_TARGET="${CROSS_MACOS_DEPLOYMENT_TARGET}"
 ENV OSXCROSS_MP_INC="1"
 ENV PATH="${OSX_CROSS_PATH}/bin:${LLVM_DIR}/bin:${PATH}"
 ENV CROSS_SYSROOT="${OSX_CROSS_PATH}/SDK/MacOSX11.1.sdk"
+ENV TOOLCHAIN_RECORD_LLVM="${LLVM_DIR}/llvm.json"
+ENV TOOLCHAIN_RECORD_TARGET="${OSX_CROSS_PATH}/toolchain.json"
 
 ENV CC_${CROSS_COMPILE}="${OSX_CROSS_PATH}/bin/${CROSS_APPLE_TRIPLET}-clang"
 ENV CXX_${CROSS_COMPILE}="${OSX_CROSS_PATH}/bin/${CROSS_APPLE_TRIPLET}-clang++"

@@ -27,6 +27,7 @@ RUN set -euxo pipefail >/dev/null \
   gcc \
   git \
   gzip \
+  jq \
   libc6-dev \
   libtool \
   make \
@@ -70,7 +71,8 @@ ARG EMSCRIPTEN_DIR="/opt/emscripten"
 # configuration names the LLVM and Binaryen of the archive. Only the emcc front
 # end goes on PATH. The cache holds the prebuilt system libraries and stays
 # writable for its lock and sanity files, because the container runs as the
-# host user.
+# host user. toolchain.json records the URL and sha256 of the archive for the
+# build records of the archives.
 ENV EMSCRIPTEN_DIR="${EMSCRIPTEN_DIR}"
 ENV PATH="${EMSCRIPTEN_DIR}/emscripten:${PATH}"
 RUN set -euxo pipefail >/dev/null \
@@ -82,9 +84,11 @@ RUN set -euxo pipefail >/dev/null \
 && printf "LLVM_ROOT = '%s/bin'\nBINARYEN_ROOT = '%s'\n" "${EMSCRIPTEN_DIR}" "${EMSCRIPTEN_DIR}" >"${EMSCRIPTEN_DIR}/emscripten/.emscripten" \
 && grep -qxF "${EMSCRIPTEN_VERSION}-git" "${EMSCRIPTEN_DIR}/emscripten/emscripten-version.txt" \
 && emcc --version \
+&& jq -n --arg url "https://storage.googleapis.com/webassembly/emscripten-releases-builds/linux/${EMSCRIPTEN_BUILD}/wasm-binaries.tar.xz" --arg sha256 "${EMSCRIPTEN_SHA256}" '{url: $url, sha256: $sha256}' >"${EMSCRIPTEN_DIR}/toolchain.json" \
 && chmod -R a+rwX "${EMSCRIPTEN_DIR}/emscripten/cache"
 
 ENV CROSS_SYSROOT="${EMSCRIPTEN_DIR}/emscripten/cache/sysroot"
+ENV TOOLCHAIN_RECORD_TARGET="${EMSCRIPTEN_DIR}/toolchain.json"
 ENV CC_wasm32-unknown-emscripten="emcc"
 ENV CXX_wasm32-unknown-emscripten="em++"
 ENV AR_wasm32-unknown-emscripten="emar"
