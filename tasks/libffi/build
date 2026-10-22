@@ -3,7 +3,8 @@
 # Usage: $0
 #
 # Build static libffi for CROSS_COMPILE from the checksum-verified release
-# tarball, and package it. dev/cross/build sets the environment.
+# tarball with the patches of patches/, and package it. dev/cross/build sets
+# the environment.
 #
 # shellcheck disable=SC2155
 set -euo pipefail
@@ -32,6 +33,10 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 
 pushd "${src_dir}" >/dev/null
 {
+  for patch_file in "${task_dir}/patches/"*.patch; do
+    nicely patch --fuzz=0 -p1 -i "${patch_file}" 2>&1 | log "${build_dir}/build.log"
+  done
+
   export CC="ccache ${CC}"
   export CXX="ccache ${CXX:-}"
 
