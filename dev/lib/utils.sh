@@ -422,6 +422,91 @@ function autoconf_host() {
 }
 export -f autoconf_host
 
+# Run the CMake configure step of a source directory into a build directory for
+# CROSS_COMPILE, with the further CMake arguments given. CMake then configures
+# for the target system (WIN32, APPLE, UNIX, and the libraries of that system)
+# and not for the Linux host: WebAssembly through emcmake and the toolchain file
+# of Emscripten, the other targets through cmake_toolchain_file.
+function cmake_configure() {
+  local src_dir="${1:?source dir}"
+  local build_dir="${2:?build dir}"
+  shift 2
+  if [[ "${CROSS_COMPILE:?}" == wasm32-*-emscripten ]]; then
+    nicely emcmake cmake -S "${src_dir}" -B "${build_dir}" "$@"
+  else
+    # CMake looks for a relative toolchain file in the build and source
+    # directories, not in the working directory.
+    local toolchain_file
+    toolchain_file="$(abspath "${build_dir}")/toolchain.cmake"
+    mkdir -p "${build_dir}"
+    cmake_toolchain_file >"${toolchain_file}" || return
+    nicely cmake -S "${src_dir}" -B "${build_dir}" -DCMAKE_TOOLCHAIN_FILE="${toolchain_file}" "$@"
+  fi
+}
+export -f cmake_configure
+
+# Print a CMake toolchain file for CROSS_COMPILE from the tools that
+# dev/cross/build takes from the image (CC, CXX, AR, RANLIB) and the sysroot of
+# the image (CROSS_SYSROOT). It names the system and processor as CMake reports
+# them on the target, and restricts the search for libraries, headers, and
+# packages to the target's root: the sysroot, or for MinGW the directory of the
+# Windows import libraries of the compiler.
+function cmake_toolchain_file() {
+  local system processor
+  case "${CROSS_COMPILE:?}" in
+  x86_64-*-linux-*) system="Linux" processor="x86_64" ;;
+  aarch64-*-linux-*) system="Linux" processor="aarch64" ;;
+  x86_64-apple-darwin) system="Darwin" processor="x86_64" ;;
+  aarch64-apple-darwin) system="Darwin" processor="arm64" ;;
+  x86_64-pc-windows-*) system="Windows" processor="AMD64" ;;
+  aarch64-pc-windows-*) system="Windows" processor="ARM64" ;;
+  *)
+    err "No CMake system known for ${CROSS_COMPILE}" >&2
+    return 1
+    ;;
+  esac
+
+  local root="${CROSS_SYSROOT:-}"
+  if [[ "${system}" == "Windows" ]]; then
+    local kernel32
+    kernel32="$(${CC:?} -print-file-name=libkernel32.a)"
+    if [[ "${kernel32}" != /* ]]; then
+      err "${CC} finds no libkernel32.a for ${CROSS_COMPILE}" >&2
+      return 1
+    fi
+    root="$(abspath "$(dirname "${kernel32}")/..")"
+  fi
+  : "${root:?"No target root for ${CROSS_COMPILE}: the image sets no CROSS_SYSROOT"}"
+
+  printf 'set(CMAKE_SYSTEM_NAME "%s")\n' "${system}"
+  printf 'set(CMAKE_SYSTEM_PROCESSOR "%s")\n' "${processor}"
+  printf 'set(CMAKE_C_COMPILER "%s")\n' "${CC:?}"
+  if [[ -n "${CXX:-}" ]]; then
+    printf 'set(CMAKE_CXX_COMPILER "%s")\n' "${CXX}"
+  fi
+  printf 'set(CMAKE_AR "%s")\n' "${AR:?}"
+  printf 'set(CMAKE_RANLIB "%s")\n' "${RANLIB:?}"
+  case "${system}" in
+  Linux)
+    printf 'set(CMAKE_SYSROOT "%s")\n' "${root}"
+    ;;
+  Darwin)
+    printf 'set(CMAKE_OSX_SYSROOT "%s")\n' "${root}"
+    printf 'set(CMAKE_OSX_DEPLOYMENT_TARGET "%s")\n' "${MACOSX_DEPLOYMENT_TARGET:?}"
+    ;;
+  Windows)
+    # The resource compiler of the MinGW toolchain, next to its C compiler.
+    printf 'set(CMAKE_RC_COMPILER "%s")\n' "${CC%-*}-windres"
+    ;;
+  esac
+  printf 'set(CMAKE_FIND_ROOT_PATH "%s")\n' "${root}"
+  printf 'set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)\n'
+  printf 'set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)\n'
+  printf 'set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)\n'
+  printf 'set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)\n'
+}
+export -f cmake_toolchain_file
+
 function getenv_cross() {
   local varname="${1:?}"
   local target="${2:-${CROSS_COMPILE:?}}"

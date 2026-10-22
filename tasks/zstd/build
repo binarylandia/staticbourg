@@ -37,14 +37,12 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 
 pushd "${src_dir}" >/dev/null
 {
-  cmake=(cmake)
   multithread="ON"
   if [[ "${CROSS_COMPILE}" == wasm32-*-emscripten ]]; then
-    cmake=(emcmake cmake)
     multithread="OFF"
   fi
 
-  nicely "${cmake[*]}" -S "build/cmake" -B "build" \
+  cmake_configure "build/cmake" "build" \
     -Wno-dev -Wno-deprecated \
     -DCMAKE_INSTALL_PREFIX="${install_dir}" \
     -DCMAKE_INSTALL_LIBDIR="lib" \
