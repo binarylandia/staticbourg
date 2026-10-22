@@ -15,25 +15,14 @@ function build() {
   declare -x INSTALL_DIR="${INSTALL_DIR:-"$(project_root)/.install/${CROSS_COMPILE}/${BUILD_TIME}/${name}"}"
   declare -x OUT_DIR="${OUT_DIR:-"$(project_root)/.out/${BUILD_TIME}"}"
 
-  declare -x SYSROOT="${CROSS_SYSROOT:?}"
-  declare -x CC="$(getenv_cross "CC" "${CROSS_COMPILE}")"
-  declare -x CXX="$(getenv_cross "CXX" "${CROSS_COMPILE}")"
-  declare -x FC="$(getenv_cross "FC" "${CROSS_COMPILE}")"
-  declare -x ADDR2LINE="$(getenv_cross "ADDR2LINE" "${CROSS_COMPILE}")"
-  declare -x AR="$(getenv_cross "AR" "${CROSS_COMPILE}")"
-  declare -x AS="$(getenv_cross "AS" "${CROSS_COMPILE}")"
-  declare -x CPP="$(getenv_cross "CPP" "${CROSS_COMPILE}")"
-  declare -x ELFEDIT="$(getenv_cross "ELFEDIT" "${CROSS_COMPILE}")"
-  declare -x LD="$(getenv_cross "LD" "${CROSS_COMPILE}")"
-  declare -x LDD="$(getenv_cross "LDD" "${CROSS_COMPILE}")"
-  declare -x NM="$(getenv_cross "NM" "${CROSS_COMPILE}")"
-  declare -x OBJCOPY="$(getenv_cross "OBJCOPY" "${CROSS_COMPILE}")"
-  declare -x OBJDUMP="$(getenv_cross "OBJDUMP" "${CROSS_COMPILE}")"
-  declare -x RANLIB="$(getenv_cross "RANLIB" "${CROSS_COMPILE}")"
-  declare -x READELF="$(getenv_cross "READELF" "${CROSS_COMPILE}")"
-  declare -x SIZE="$(getenv_cross "SIZE" "${CROSS_COMPILE}")"
-  declare -x STRINGS="$(getenv_cross "STRINGS" "${CROSS_COMPILE}")"
-  declare -x STRIP="$(getenv_cross "STRIP" "${CROSS_COMPILE}")"
+  # The binary tools of the target that its image names (CC_<target> and so on).
+  local tool value
+  for tool in CC CXX ADDR2LINE AR AS CPP ELFEDIT LD LDD NM OBJCOPY OBJDUMP RANLIB READELF SIZE STRINGS STRIP; do
+    if value="$(getenv_cross "${tool}" "${CROSS_COMPILE}")"; then
+      declare -x "${tool}=${value}"
+    fi
+  done
+  : "${CC:?"The image names no C compiler for ${CROSS_COMPILE} (CC_${CROSS_COMPILE})"}"
 
   declare -x CCACHE_DIR="$(get_cache_dir "${CROSS_COMPILE}")/ccache"
   declare -x CCACHE_NOCOMPRESS="1"
@@ -43,33 +32,39 @@ function build() {
 
   # The CPU baseline of the consumers' builds, which link these archives: a
   # library above it stops the consumer with an illegal instruction on an older
-  # CPU that the consumer itself supports.
+  # CPU that the consumer itself supports. These are the flags of
+  # export_dist_flags in dev/lib/dist-flags.sh of TreeTime.
   # - x86_64: x86-64-v2 (SSE4.2, POPCNT, CMPXCHG16B)
   # - aarch64 Linux: Armv8.0, with atomics through the outline atomics helpers,
   #   which use LSE instructions when the CPU has them
+  # - aarch64 Windows: LSE atomics of Armv8.1, which Windows 11 on Arm requires;
+  #   the Windows targets have no outline atomics helpers
   # - aarch64 macOS: Apple M1, the first Apple CPU with an arm64 Mac
-  local c_arch=""
+  local cpu_flags=""
   case "${CROSS_COMPILE}" in
   aarch64-apple* | aarch64-darwin*)
-    c_arch="-mcpu=apple-m1"
+    cpu_flags="-mcpu=apple-m1"
+    ;;
+  aarch64-*-windows-*)
+    cpu_flags="-march=armv8-a+lse"
     ;;
   aarch64*)
-    c_arch="-march=armv8-a -moutline-atomics"
+    cpu_flags="-march=armv8-a -moutline-atomics"
     ;;
   x86_64*)
-    c_arch="-march=x86-64-v2"
+    cpu_flags="-march=x86-64-v2"
     ;;
   esac
 
-  local opt_flags="-fPIC -g0 -O3 -ftree-vectorize -funroll-loops"
-  local sysroot="--sysroot=${CROSS_SYSROOT}"
-
-  local static_flags=
-  if [[ "${CROSS_COMPILE}" =~ (apple|darwin) ]]; then
-    static_flags="-static-libstdc++"
-  else
-    static_flags="" #"-static -static-libgcc -static-libgfortran -static-libstdc++"
+  # The msvcrt target serves the Windows 7 build of the consumers, so the
+  # Windows headers declare only the functions of Windows 7.
+  local win32_winnt=""
+  if [[ "${CROSS_COMPILE}" == "x86_64-pc-windows-gnu" ]]; then
+    win32_winnt="0x0601"
   fi
+
+  local opt_flags="-fPIC -g0 -O3 -ftree-vectorize -funroll-loops"
+  local sysroot="${CROSS_SYSROOT:+--sysroot=${CROSS_SYSROOT}}"
 
   local ldflags="-s"
 
@@ -83,15 +78,15 @@ function build() {
     unset CMAKE_C_COMPILER_LAUNCHER CMAKE_CXX_COMPILER_LAUNCHER
   fi
 
-  local common_flags="-w ${opt_flags} ${static_flags} ${c_arch} ${sysroot}"
-  local cflags=""
-  local cxxflags=""
-  local fcflags=""
+  local common_flags
+  common_flags="$(join_words "-w ${opt_flags} ${cpu_flags} ${win32_winnt:+-D_WIN32_WINNT=${win32_winnt}} ${sysroot}")"
 
-  declare -x CFLAGS="${CFLAGS:-} ${common_flags} ${cflags}"
-  declare -x CXXFLAGS="${CXXFLAGS:-} ${common_flags} ${cxxflags}"
-  declare -x FCFLAGS="${FCFLAGS:-} ${common_flags} ${fcflags}"
-  declare -x LDFLAGS="${LDFLAGS:-} ${common_flags} ${ldflags}"
+  declare -x CFLAGS
+  CFLAGS="$(join_words "${CFLAGS:-} ${common_flags}")"
+  declare -x CXXFLAGS
+  CXXFLAGS="$(join_words "${CXXFLAGS:-} ${common_flags}")"
+  declare -x LDFLAGS
+  LDFLAGS="$(join_words "${LDFLAGS:-} ${common_flags} ${ldflags}")"
 
   nicely "$(project_root)/tasks/${name}/build"
 }

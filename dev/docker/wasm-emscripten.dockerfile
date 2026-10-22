@@ -4,7 +4,7 @@
 # Build image of the wasm32-unknown-emscripten target: emcc compiles the
 # libraries, the GCC of Debian compiles the helper programs that some builds run
 # on the build machine, and Node runs emcc.
-FROM debian:12.7
+FROM debian:12.15-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
 
 SHELL ["bash", "-euxo", "pipefail", "-c"]
 
@@ -13,8 +13,8 @@ ENV CROSS_COMPILE="${CROSS_COMPILE}"
 
 RUN set -euxo pipefail >/dev/null \
 && export DEBIAN_FRONTEND=noninteractive \
-&& apt-get update -qq --yes \
-&& apt-get install -qq --no-install-recommends --yes \
+&& apt-get update -qq \
+&& apt-get install --no-install-recommends --yes -qq \
   autoconf \
   automake \
   bash \
@@ -44,9 +44,9 @@ RUN set -euxo pipefail >/dev/null \
   xz-utils \
   zstd \
 >/dev/null \
-&& rm -rf /var/lib/apt/lists/* \
 && apt-get clean autoclean >/dev/null \
-&& apt-get autoremove --yes >/dev/null
+&& apt-get autoremove --yes >/dev/null \
+&& rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 ARG NODE_VERSION="24.21.0"
 ARG NODE_SHA256="fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6"

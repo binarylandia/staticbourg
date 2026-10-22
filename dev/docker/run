@@ -14,60 +14,74 @@ GROUP="user"
 CROSS_GCC_TRIPLET="${CROSS_COMPILE}"
 case "${CROSS_COMPILE}" in
 x86_64-unknown-linux-gnu)
-  dockerfile="$(project_root)/dev/docker/cross-linux.dockerfile"
+  dockerfile="dev/docker/cross-linux.dockerfile"
   CROSS_ARCH_DEBIAN="amd64"
   CROSS_ARCH="x86_64"
   CROSS_COMPILE_UPPER="X86_64_UNKNOWN_LINUX_GNU"
   CROSS_RUNNER="qemu-${CROSS_ARCH}"
   ;;
 x86_64-unknown-linux-musl)
-  dockerfile="$(project_root)/dev/docker/cross-linux.dockerfile"
+  dockerfile="dev/docker/cross-linux.dockerfile"
   CROSS_ARCH_DEBIAN="amd64"
   CROSS_ARCH="x86_64"
   CROSS_COMPILE_UPPER="X86_64_UNKNOWN_LINUX_MUSL"
   CROSS_RUNNER="qemu-${CROSS_ARCH}"
   ;;
 aarch64-unknown-linux-gnu)
-  dockerfile="$(project_root)/dev/docker/cross-linux.dockerfile"
+  dockerfile="dev/docker/cross-linux.dockerfile"
   CROSS_ARCH_DEBIAN="arm64"
   CROSS_ARCH="aarch64"
   CROSS_COMPILE_UPPER="AARCH64_UNKNOWN_LINUX_GNU"
   CROSS_RUNNER="qemu-${CROSS_ARCH}"
   ;;
 aarch64-unknown-linux-musl)
-  dockerfile="$(project_root)/dev/docker/cross-linux.dockerfile"
+  dockerfile="dev/docker/cross-linux.dockerfile"
   CROSS_ARCH_DEBIAN="arm64"
   CROSS_ARCH="aarch64"
   CROSS_COMPILE_UPPER="AARCH64_UNKNOWN_LINUX_MUSL"
   CROSS_RUNNER="qemu-${CROSS_ARCH}"
   ;;
 x86_64-apple-darwin)
-  dockerfile="$(project_root)/dev/docker/cross-darwin.dockerfile"
+  dockerfile="dev/docker/cross-darwin.dockerfile"
   CROSS_COMPILE_UPPER="X86_64_APPLE_DARWIN"
   CROSS_APPLE_TRIPLET="x86_64-apple-darwin20.2"
   CROSS_GCC_TRIPLET="x86_64-apple-darwin20.2"
+  CROSS_MACOS_DEPLOYMENT_TARGET="10.12"
   ;;
 aarch64-apple-darwin)
-  dockerfile="$(project_root)/dev/docker/cross-darwin.dockerfile"
+  dockerfile="dev/docker/cross-darwin.dockerfile"
   CROSS_COMPILE_UPPER="AARCH64_APPLE_DARWIN"
   CROSS_APPLE_TRIPLET="arm64-apple-darwin20.2"
   CROSS_GCC_TRIPLET="aarch64-apple-darwin20.2"
+  CROSS_MACOS_DEPLOYMENT_TARGET="11.0"
   ;;
 x86_64-pc-windows-gnu)
-  dockerfile="$(project_root)/dev/docker/cross-linux.dockerfile"
-  CROSS_ARCH_DEBIAN="amd64"
+  dockerfile="dev/docker/cross-windows-gnu.dockerfile"
   CROSS_ARCH="x86_64"
   CROSS_COMPILE_UPPER="X86_64_PC_WINDOWS_GNU"
-  CROSS_GCC_TRIPLET="x86_64-w64-mingw32"
+  CROSS_MINGW_TRIPLET="x86_64-w64-mingw32"
   CROSS_RUNNER="/usr/lib/wine/wine64"
   ;;
+x86_64-pc-windows-gnullvm)
+  dockerfile="dev/docker/cross-windows.dockerfile"
+  CROSS_ARCH="x86_64"
+  CROSS_COMPILE_UPPER="X86_64_PC_WINDOWS_GNULLVM"
+  CROSS_MINGW_TRIPLET="x86_64-w64-mingw32"
+  CROSS_RUNNER="/usr/lib/wine/wine64"
+  ;;
+aarch64-pc-windows-gnullvm)
+  dockerfile="dev/docker/cross-windows.dockerfile"
+  CROSS_ARCH="aarch64"
+  CROSS_COMPILE_UPPER="AARCH64_PC_WINDOWS_GNULLVM"
+  CROSS_MINGW_TRIPLET="aarch64-w64-mingw32"
+  ;;
 wasm32-unknown-emscripten)
-  dockerfile="$(project_root)/dev/docker/wasm-emscripten.dockerfile"
+  dockerfile="dev/docker/wasm-emscripten.dockerfile"
   CROSS_COMPILE_UPPER="WASM32_UNKNOWN_EMSCRIPTEN"
   CROSS_RUNNER="node"
   ;;
 native)
-  dockerfile="$(project_root)/dev/docker/native.dockerfile"
+  dockerfile="dev/docker/native.dockerfile"
   ;;
 *)
   printf "Unsupported CROSS_COMPILE value: %s", "${CROSS_COMPILE}"
@@ -92,7 +106,7 @@ if ! docker inspect --format '{{.Id}}' "${PROJECT_DOCKER_REPO}:${docker_image_ta
   export BUILDKIT_PROGRESS=plain
   export PROGRESS_NO_TRUNC=1
   docker buildx build \
-    --file="${dockerfile}" \
+    --file="$(project_root)/${dockerfile}" \
     --tag="${PROJECT_DOCKER_REPO}:${docker_image_tag}" \
     --network=host \
     --build-arg="UID=$(id -u)" \
@@ -105,6 +119,8 @@ if ! docker inspect --format '{{.Id}}' "${PROJECT_DOCKER_REPO}:${docker_image_ta
     --build-arg="CROSS_COMPILE_UPPER=${CROSS_COMPILE_UPPER:-}" \
     --build-arg="CROSS_APPLE_TRIPLET=${CROSS_APPLE_TRIPLET:-}" \
     --build-arg="CROSS_GCC_TRIPLET=${CROSS_GCC_TRIPLET:-}" \
+    --build-arg="CROSS_MINGW_TRIPLET=${CROSS_MINGW_TRIPLET:-}" \
+    --build-arg="CROSS_MACOS_DEPLOYMENT_TARGET=${CROSS_MACOS_DEPLOYMENT_TARGET:-}" \
     --build-arg="CROSS_RUNNER=${CROSS_RUNNER:-}" \
     --load \
     . >/dev/null

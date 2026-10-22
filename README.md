@@ -14,15 +14,36 @@ WebAssembly (`lzma` and `zstd` only):
 ./dev/cross/all --target=wasm32-unknown-emscripten lzma zstd
 ```
 
+`--target=<triple>` selects targets, and `--serial` builds one target at a time. The archives go to `.out/<build time>/`; set `BUILD_TIME` to give several runs one build time.
+
 ## What is this?
 
 Cross-compiles common C libraries as static archives for Linux, macOS, and Windows. All libraries built with position-independent code (-fPIC) for embedding into applications or shared libraries.
+
+## Targets and toolchains
+
+The toolchains are binarylandia releases, the same as in the [TreeTime](https://github.com/neherlab/treetime) builds that link the archives:
+
+| Target | Compiler | C runtime | OS level | CPU baseline |
+| --- | --- | --- | --- | --- |
+| `x86_64-unknown-linux-gnu` | clang of LLVM 22.1.8 on the GCC 16.2.0 toolchain | glibc 2.17 | | `-march=x86-64-v2` |
+| `aarch64-unknown-linux-gnu` | clang of LLVM 22.1.8 on the GCC 16.2.0 toolchain | glibc 2.17 | | `-march=armv8-a -moutline-atomics` |
+| `x86_64-unknown-linux-musl` | clang of LLVM 22.1.8 on the GCC 16.2.0 toolchain | musl 1.2.6 | | `-march=x86-64-v2` |
+| `aarch64-unknown-linux-musl` | clang of LLVM 22.1.8 on the GCC 16.2.0 toolchain | musl 1.2.6 | | `-march=armv8-a -moutline-atomics` |
+| `x86_64-apple-darwin` | osxcross (macOS 11.1 SDK) on LLVM 22.1.8 | | macOS 10.12 | `-march=x86-64-v2` |
+| `aarch64-apple-darwin` | osxcross (macOS 11.1 SDK) on LLVM 22.1.8 | | macOS 11.0 | `-mcpu=apple-m1` |
+| `x86_64-pc-windows-gnullvm` | llvm-mingw 22.1.8 | UCRT | | `-march=x86-64-v2` |
+| `aarch64-pc-windows-gnullvm` | llvm-mingw 22.1.8 | UCRT | | `-march=armv8-a+lse` |
+| `x86_64-pc-windows-gnu` | MinGW GCC 16.2.0 | msvcrt | Windows 7 (`_WIN32_WINNT=0x0601`) | `-march=x86-64-v2` |
+| `wasm32-unknown-emscripten` | Emscripten 6.0.10 | | | |
+
+The toolchain archives are pinned with their sha256 in `dev/docker/files/`. The x86_64 and arm64 Linux baselines let the archives run on every CPU that their consumers support: x86-64-v2 has no AVX, and Armv8.0 runs on Cortex-A53 and Cortex-A72 cores, with LSE atomics through the outline atomics helpers where the CPU has them. Windows on Arm requires LSE, and the Windows targets have no outline atomics helpers.
 
 ## Features
 
 - Static libraries with -fPIC for flexible linking
 - Optimized builds (-O3, vectorization, loop unrolling)
-- CPU baseline x86-64-v2 for x86_64, ARMv8.0-A with outline atomics for aarch64 Linux, Apple M1 for aarch64 macOS, so the archives run on every CPU that their consumers support
+- Sources downloaded from the upstream releases and verified by sha256 (`tasks/<name>/checksums`)
 - Multiple compression formats (xz, gzip, zstd)
 - WebAssembly archives of lzma and zstd for Emscripten, built with `emcc` and without threads. Emscripten has no ABI guarantee between versions, so these archives link only with the Emscripten version in their name (`wasm32-unknown-emscripten.6.0.10`), which `share/emscripten-version.txt` also records
 

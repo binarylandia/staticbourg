@@ -222,13 +222,8 @@ function fetch_verified_tarball() {
   local url="${1:?url}"
   local checksums="${2:?checksums file}"
   local dest_dir="${3:?destination}"
-  local name="${url##*/}"
   local expected actual tmp
-  expected="$(awk -v name="${name}" '$2 == name { print $1 }' "${checksums}")"
-  if [[ -z "${expected}" ]]; then
-    err "No checksum recorded for ${name} in ${checksums}"
-    return 1
-  fi
+  expected="$(recorded_sha256 "${url}" "${checksums}")"
   tmp="$(mktemp)"
   curl -fsSL --retry 3 -o "${tmp}" "${url}"
   actual="$(sha256sum "${tmp}" | cut -d' ' -f1)"
@@ -243,6 +238,22 @@ function fetch_verified_tarball() {
   rm -f "${tmp}"
 }
 export -f fetch_verified_tarball
+
+# Print the sha256 of a download that a checksums file records (lines of
+# "<sha256>  <file name>", keyed by the file name of the URL), or fail.
+function recorded_sha256() {
+  local url="${1:?url}"
+  local checksums="${2:?checksums file}"
+  local name="${url##*/}"
+  local sha256
+  sha256="$(awk -v name="${name}" '$2 == name { print $1 }' "${checksums}")"
+  if [[ -z "${sha256}" ]]; then
+    err "No checksum recorded for ${name} in ${checksums}" >&2
+    return 1
+  fi
+  printf '%s\n' "${sha256}"
+}
+export -f recorded_sha256
 
 # Name of a target in package names. Emscripten gives no ABI guarantee between
 # versions, so a WebAssembly library links only with the Emscripten version that
@@ -269,6 +280,29 @@ function install_target_info() {
   fi
 }
 export -f install_target_info
+
+# Print the words of a string separated by single spaces.
+function join_words() {
+  local words
+  read -ra words <<<"${1:-}"
+  printf '%s\n' "${words[*]}"
+}
+export -f join_words
+
+# Print the host triplet of autoconf for a target: the MinGW triplet for the
+# Windows targets, the target itself otherwise.
+function autoconf_host() {
+  local target="${1:?target}"
+  case "${target}" in
+  *-pc-windows-gnu | *-pc-windows-gnullvm)
+    printf '%s-w64-mingw32\n' "${target%%-*}"
+    ;;
+  *)
+    printf '%s\n' "${target}"
+    ;;
+  esac
+}
+export -f autoconf_host
 
 function getenv_cross() {
   local varname="${1:?}"

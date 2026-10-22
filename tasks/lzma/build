@@ -35,21 +35,16 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 
 pushd "${src_dir}" >/dev/null
 {
-  host="${CROSS_COMPILE}"
+  host="$(autoconf_host "${CROSS_COMPILE}")"
   configure=(./configure)
   threads="yes"
-  case "${CROSS_COMPILE}" in
-  x86_64-pc-windows-gnu)
-    host="x86_64-w64-mingw32"
-    ;;
-  wasm32-*-emscripten)
+  if [[ "${CROSS_COMPILE}" == wasm32-*-emscripten ]]; then
     configure=(emconfigure ./configure)
     threads="no"
-    ;;
-  esac
+  fi
   if [[ "${CROSS_COMPILE}" != wasm32-* ]]; then
     export CC="ccache ${CC}"
-    export CXX="ccache ${CXX}"
+    export CXX="ccache ${CXX:-}"
   fi
 
   nicely "${configure[*]}" \
