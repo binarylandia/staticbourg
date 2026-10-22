@@ -9,6 +9,7 @@ function build() {
   trap "exit" INT
 
   local name="${1:?}"
+  declare -x TASK="${name}"
   declare -x CROSS_COMPILE="${2:-${CROSS_COMPILE:?}}"
   declare -x BUILD_TIME="${BUILD_TIME:-"$(datetime_safe)"}"
   declare -x BUILD_DIR="${BUILD_DIR:-"$(project_root)/.build/${CROSS_COMPILE}"}"

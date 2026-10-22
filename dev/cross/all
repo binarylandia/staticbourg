@@ -7,17 +7,7 @@ source "${BASH_SOURCE%/*}/../lib/utils.sh"
 
 # The targets of a plain run. wasm32-unknown-emscripten builds only on request
 # (--target=wasm32-unknown-emscripten), because only some tasks support it.
-export targets=(
-  "x86_64-unknown-linux-gnu"
-  "x86_64-unknown-linux-musl"
-  "aarch64-unknown-linux-gnu"
-  "aarch64-unknown-linux-musl"
-  "x86_64-pc-windows-gnu"
-  "x86_64-pc-windows-gnullvm"
-  "aarch64-pc-windows-gnullvm"
-  "aarch64-apple-darwin"
-  "x86_64-apple-darwin"
-)
+targets=("${NATIVE_TARGETS[@]}")
 
 export BUILD_TIME="${BUILD_TIME:-$(datetime_safe)}"
 # Resolved here, because the functions that GNU parallel runs have no source
@@ -51,15 +41,14 @@ function run_one() {
   if [ -n "${name}" ] && [ "${name}" != "all" ]; then
     build_one_name "${name}"
   else
-    local build_scripts=() build_script
-    mapfile -t build_scripts < <(find "${PROJECT_ROOT:?}/tasks" -mindepth 2 -maxdepth 2 -name "build" | LC_ALL=C sort)
-    if ((${#build_scripts[@]} == 0)); then
+    local names=() task_name
+    mapfile -t names < <(task_names "${PROJECT_ROOT:?}")
+    if ((${#names[@]} == 0)); then
       err "No tasks found in ${PROJECT_ROOT}/tasks"
       return 1
     fi
-    for build_script in "${build_scripts[@]}"; do
-      local name=$(basename "$(dirname "${build_script}")")
-      build_one_name "${name}"
+    for task_name in "${names[@]}"; do
+      build_one_name "${task_name}"
     done
   fi
 }

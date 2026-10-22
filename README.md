@@ -25,7 +25,7 @@ One build of every task and target with one `BUILD_TIME`, then:
 ./dev/release <build time>
 ```
 
-`dev/release` checks that every archive comes from a clean build of the pushed `HEAD`, and publishes the release `<build time>` with the archives, `SHA256SUMS`, and `manifest.json`.
+`dev/release` checks that the archives are the full set (every task for every native target, and lzma and zstd for `wasm32-unknown-emscripten`, each in the three formats), that every archive comes from a clean build of `HEAD`, that a branch of `origin` (`binarylandia/staticbourg`) has `HEAD`, and that no release or other commit has the tag `<build time>`. Then it publishes the release `<build time>` with the archives, `SHA256SUMS`, and `manifest.json`.
 
 ## What is this?
 
@@ -54,7 +54,7 @@ The toolchain archives are pinned with their sha256 in `dev/docker/files/`. The 
 
 Each archive contains `share/staticbourg/build.json`, and the release carries the same record per archive in `manifest.json`:
 
-- `name`, `library`, `version`, `source`, `source_sha256`: the archive, and the library with its source tarball
+- `name`, `task`, `library`, `version`, `source`, `source_sha256`: the archive, the task (`tasks/<task>/build`), and the library with its source tarball
 - `kind`: `native`, or `wasm`
 - `target`, `compiler`: the target, and the first line of `$CC --version`
 - `llvm`: the `binarylandia/build_llvm` release of the build image (native targets)

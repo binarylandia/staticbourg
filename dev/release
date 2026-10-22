@@ -10,9 +10,12 @@
 # The release:
 #   - is named after the build time, for example 2026-10-21_13-40-13, and has no
 #     description
-#   - points at the commit that built the archives, which must be clean and
-#     pushed to origin
-#   - carries the archives
+#   - points at the commit that built the archives, which must be clean and on a
+#     branch of origin (binarylandia/staticbourg on GitHub). A tag of that name
+#     that origin already has must point at the same commit
+#   - carries the full set of archives: every task for every native target, and
+#     the WebAssembly tasks for wasm32-unknown-emscripten (NATIVE_TARGETS,
+#     WASM_TASKS in dev/lib/utils.sh), each as .tar.xz, .tar.gz, and .tar.zst
 #     (<library>-<version>-static-<target>-<build time>.tar.{xz,gz,zst}),
 #     SHA256SUMS, and manifest.json with the build record of every archive
 #     (library, version, source and its sha256, target, compiler, the LLVM
@@ -24,7 +27,8 @@
 #
 # Options:
 #   --dry-run    Check and write SHA256SUMS and manifest.json, but publish
-#                nothing. A commit that origin lacks is reported, not fatal
+#                nothing. A commit that no branch of origin has is reported,
+#                not fatal
 #   -h, --help   Show this help
 #
 # Examples:
@@ -37,22 +41,34 @@ trap "exit" INT
 THIS_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 ROOT_DIR="$(realpath "${THIS_DIR}/..")"
 REPO="binarylandia/staticbourg"
+# shellcheck source=./lib/utils.sh
+source "${THIS_DIR}/lib/utils.sh"
 
 function fail() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1
 }
 
-# Fail unless HEAD is a clean commit. Fail, or with --dry-run only report, when
-# origin does not have it.
+# Fail unless HEAD is a clean commit and origin is the GitHub repository REPO.
+# Fail, or with --dry-run only report, when no branch of origin has the commit,
+# by the branches of origin fetched now: a stale or deleted remote branch and
+# the branches of other remotes do not count.
 function check_commit() {
   local commit="${1}"
   local dry_run="${2}"
   if [[ -n "$(git -C "${ROOT_DIR}" status --porcelain)" ]]; then
     fail "the working tree has uncommitted or untracked files"
   fi
-  git -C "${ROOT_DIR}" fetch --quiet origin
-  if [[ -z "$(git -C "${ROOT_DIR}" branch --remotes --contains "${commit}")" ]]; then
+  local url
+  url="$(git -C "${ROOT_DIR}" remote get-url origin)" || fail "the checkout has no remote origin"
+  if ! [[ "${url}" =~ ^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)${REPO}(\.git)?/?$ ]]; then
+    fail "origin is ${url}, not ${REPO} on GitHub"
+  fi
+  local err
+  if ! err="$(git -C "${ROOT_DIR}" fetch --quiet --prune origin '+refs/heads/*:refs/remotes/origin/*' 2>&1)"; then
+    fail "fetching origin: ${err}"
+  fi
+  if [[ -z "$(git -C "${ROOT_DIR}" for-each-ref --contains="${commit}" --format='%(refname)' 'refs/remotes/origin/')" ]]; then
     if "${dry_run}"; then
       printf 'WARNING: commit %s is not pushed to origin; publication would stop here\n' "${commit}" >&2
     else
@@ -61,8 +77,39 @@ function check_commit() {
   fi
 }
 
+# Fail unless the build records cover the full set of archives once each: every
+# task for every native target, and the WebAssembly tasks for WASM_TARGET.
+function check_matrix() {
+  local records=("$@")
+  local task target expected actual
+  expected="$(
+    while IFS= read -r task; do
+      for target in "${NATIVE_TARGETS[@]}"; do
+        printf '%s %s\n' "${task}" "${target}"
+      done
+    done < <(task_names "${ROOT_DIR}")
+    for task in "${WASM_TASKS[@]}"; do
+      printf '%s %s\n' "${task}" "${WASM_TARGET}"
+    done
+  )"
+  expected="$(LC_ALL=C sort <<<"${expected}")"
+  actual="$(jq -r '"\(.task) \(.target)"' "${records[@]}" | LC_ALL=C sort)"
+
+  local missing extra duplicate
+  missing="$(LC_ALL=C comm -23 <(printf '%s\n' "${expected}") <(printf '%s\n' "${actual}" | uniq))"
+  extra="$(LC_ALL=C comm -13 <(printf '%s\n' "${expected}") <(printf '%s\n' "${actual}" | uniq))"
+  duplicate="$(uniq -d <<<"${actual}")"
+  [[ -z "${missing}" ]] || fail "no archives of these tasks and targets:
+${missing}"
+  [[ -z "${extra}" ]] || fail "archives of tasks and targets outside the release set:
+${extra}"
+  [[ -z "${duplicate}" ]] || fail "more than one build record for these tasks and targets:
+${duplicate}"
+}
+
 # Fail unless every build record comes from a clean build of the commit at the
-# build time and names files that exist, and every archive has a build record.
+# build time and names its archive in the three formats, the files exist, and
+# every archive has a build record.
 function check_records() {
   local out_dir="${1}"
   local commit="${2}"
@@ -80,6 +127,9 @@ function check_records() {
     if [[ "$(jq -r '.build_time' "${record}")" != "${build_time}" ]]; then
       fail "${record} has the build time $(jq -r '.build_time' "${record}"), not ${build_time}"
     fi
+    if ! jq -e '. as $r | (.files | sort) == (["tar.gz", "tar.xz", "tar.zst"] | map("\($r.name).\(.)"))' "${record}" >/dev/null; then
+      fail "${record} does not name its archive as .tar.xz, .tar.gz, and .tar.zst: $(jq -c '.files' "${record}")"
+    fi
     local files=()
     mapfile -t files < <(jq -r '.files[]' "${record}")
     local file
@@ -94,6 +144,54 @@ function check_records() {
   if [[ "${recorded}" != "${archives}" ]]; then
     fail "the archives in ${out_dir} differ from those of the build records:
 $(diff <(printf '%s\n' "${recorded}") <(printf '%s\n' "${archives}") || true)"
+  fi
+}
+
+# Fail when the GitHub repository REPO has a release with the tag. Only the
+# answer that the release is not found, in a repository that exists, counts as
+# absent; every other failure of gh stops with its message.
+function check_release_absent() {
+  local tag="${1}"
+  local out
+  if ! out="$(gh api "repos/${REPO}" --jq='.full_name' 2>&1)"; then
+    fail "gh api repos/${REPO}: ${out}"
+  fi
+  if out="$(gh release view "${tag}" --repo="${REPO}" --json=tagName 2>&1)"; then
+    fail "release ${tag} exists; a published release is never changed"
+  fi
+  if [[ "${out}" != "release not found" ]]; then
+    fail "gh release view ${tag}: ${out}"
+  fi
+}
+
+# Print the commit of a tag of origin, or nothing when origin has no such tag.
+function origin_tag_commit() {
+  local tag="${1}"
+  local refs
+  if ! refs="$(git -C "${ROOT_DIR}" ls-remote --tags origin "refs/tags/${tag}" 2>&1)"; then
+    fail "git ls-remote origin refs/tags/${tag}: ${refs}"
+  fi
+  # An annotated tag lists the tag object, then the commit as <tag>^{}.
+  local sha ref commit=""
+  while read -r sha ref; do
+    case "${ref}" in
+    "refs/tags/${tag}^{}") commit="${sha}" ;;
+    "refs/tags/${tag}") commit="${commit:-${sha}}" ;;
+    esac
+  done <<<"${refs}"
+  printf '%s' "${commit}"
+}
+
+# Fail when origin has the tag, and it points at a commit other than the build
+# commit: gh release create would publish the release at that tag, and not at
+# the commit that built the archives.
+function check_tag() {
+  local tag="${1}"
+  local commit="${2}"
+  local tag_commit
+  tag_commit="$(origin_tag_commit "${tag}")"
+  if [[ -n "${tag_commit}" && "${tag_commit}" != "${commit}" ]]; then
+    fail "tag ${tag} of origin points at ${tag_commit}, not at the build commit ${commit}"
   fi
 }
 
@@ -142,11 +240,11 @@ main() {
   mapfile -t records < <(find "${out_dir}" -maxdepth 1 -type f -name '*.json' ! -name 'manifest.json' | LC_ALL=C sort)
   ((${#records[@]} > 0)) || fail "${out_dir} has no build records"
   check_records "${out_dir}" "${commit}" "${build_time}" "${records[@]}"
+  check_matrix "${records[@]}"
 
   local tag="${build_time}"
-  if gh release view "${tag}" --repo="${REPO}" >/dev/null 2>&1; then
-    fail "release ${tag} exists; a published release is never changed"
-  fi
+  check_release_absent "${tag}"
+  check_tag "${tag}" "${commit}"
 
   local manifest="${out_dir}/manifest.json"
   jq -s --arg repository "${REPO}" --arg commit "${commit}" --arg build_time "${build_time}" \
@@ -164,12 +262,20 @@ main() {
     return
   fi
 
+  # The tag can appear on origin after the checks above.
+  check_tag "${tag}" "${commit}"
   (cd "${out_dir}" && gh release create "${tag}" \
     --repo="${REPO}" \
     --target="${commit}" \
     --title="${tag}" \
     --notes="" \
     -- "${files[@]}" SHA256SUMS manifest.json)
+
+  local tag_commit
+  tag_commit="$(origin_tag_commit "${tag}")"
+  if [[ "${tag_commit}" != "${commit}" ]]; then
+    fail "release ${tag} is published, but its tag points at ${tag_commit:-nothing}, not at ${commit}"
+  fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

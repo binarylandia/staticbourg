@@ -4,6 +4,27 @@ set -euo pipefail
 export JOBS="${JOBS:=$(($(nproc --all) + 2))}"
 export NICE="nice -14 ionice -c2 -n3"
 
+# The targets that every task builds for, and the tasks that also build for
+# WebAssembly. dev/cross/all builds the native targets unless --target names
+# others, and dev/release publishes only the full set: every task for every
+# native target, and the WebAssembly tasks for WASM_TARGET.
+# shellcheck disable=SC2034 # used by the scripts that source this file
+NATIVE_TARGETS=(
+  "x86_64-unknown-linux-gnu"
+  "x86_64-unknown-linux-musl"
+  "aarch64-unknown-linux-gnu"
+  "aarch64-unknown-linux-musl"
+  "x86_64-pc-windows-gnu"
+  "x86_64-pc-windows-gnullvm"
+  "aarch64-pc-windows-gnullvm"
+  "aarch64-apple-darwin"
+  "x86_64-apple-darwin"
+)
+# shellcheck disable=SC2034 # used by the scripts that source this file
+WASM_TARGET="wasm32-unknown-emscripten"
+# shellcheck disable=SC2034 # used by the scripts that source this file
+WASM_TASKS=("lzma" "zstd")
+
 function print_color() {
   local color_code="${1}"
   local message="${2}"
@@ -287,8 +308,9 @@ export -f install_target_info
 # next to them as <archive name>.json, which dev/release collects into the
 # manifest of a release. It holds the library fields given here and the
 # toolchain fields of BUILD_RECORD (toolchain_record):
-#   name, library, version, source, source_sha256: the archive name without the
-#     extension, and the library with its source tarball
+#   name, task, library, version, source, source_sha256: the archive name
+#     without the extension, the task (tasks/<task>/build), and the library with
+#     its source tarball
 #   kind: "native", or "wasm" for WebAssembly
 #   target, compiler: the target, and the first line of `$CC --version`
 #   llvm: the binarylandia/build_llvm release of the image (native only)
@@ -318,13 +340,14 @@ function package_with_record() {
   mkdir -p "$(dirname "${record}")" "${out_dir}"
   jq -n \
     --arg name "${name}" \
+    --arg task "${TASK:?}" \
     --arg library "${library}" \
     --arg version "${version}" \
     --arg source "${source}" \
     --arg source_sha256 "${source_sha256}" \
     --argjson toolchain "${BUILD_RECORD:?}" \
     --arg cflags "${CFLAGS:?}" \
-    '{name: $name, library: $library, version: $version, source: $source, source_sha256: $source_sha256}
+    '{name: $name, task: $task, library: $library, version: $version, source: $source, source_sha256: $source_sha256}
       + $toolchain
       + {cflags: $cflags}
       + {files: ["tar.xz", "tar.gz", "tar.zst"] | map("\($name).\(.)")}' \
@@ -508,6 +531,13 @@ function cmake_toolchain_file() {
   printf 'set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)\n'
 }
 export -f cmake_toolchain_file
+
+# Print the names of the tasks (tasks/<name>/build) of a checkout, sorted.
+function task_names() {
+  local root="${1:?project root}"
+  find "${root}/tasks" -mindepth 2 -maxdepth 2 -type f -name "build" -printf '%h\n' | sed 's|.*/||' | LC_ALL=C sort
+}
+export -f task_names
 
 function getenv_cross() {
   local varname="${1:?}"
