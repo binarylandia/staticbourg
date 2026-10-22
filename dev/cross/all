@@ -20,6 +20,9 @@ export targets=(
 )
 
 export BUILD_TIME="${BUILD_TIME:-$(datetime_safe)}"
+# Resolved here, because the functions that GNU parallel runs have no source
+# file to resolve it from.
+export PROJECT_ROOT="$(project_root)"
 
 function build_one_name() {
   set -euxo pipefail
@@ -48,11 +51,16 @@ function run_one() {
   if [ -n "${name}" ] && [ "${name}" != "all" ]; then
     build_one_name "${name}"
   else
-    local build_script
-    while IFS= read -r build_script; do
+    local build_scripts=() build_script
+    mapfile -t build_scripts < <(find "${PROJECT_ROOT:?}/tasks" -mindepth 2 -maxdepth 2 -name "build" | LC_ALL=C sort)
+    if ((${#build_scripts[@]} == 0)); then
+      err "No tasks found in ${PROJECT_ROOT}/tasks"
+      return 1
+    fi
+    for build_script in "${build_scripts[@]}"; do
       local name=$(basename "$(dirname "${build_script}")")
       build_one_name "${name}"
-    done < <(find "$(here)/tasks" -maxdepth 2 -name "build")
+    done
   fi
 }
 export -f run_one
