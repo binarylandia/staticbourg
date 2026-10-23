@@ -147,31 +147,43 @@ $(diff <(printf '%s\n' "${recorded}") <(printf '%s\n' "${archives}") || true)"
   fi
 }
 
-# Fail when the GitHub repository REPO has a release with the tag. Only the
-# answer that the release is not found, in a repository that exists, counts as
-# absent; every other failure of gh stops with its message.
+# Fail when the GitHub repository REPO has a release with the tag. Only HTTP 404
+# for the release, in a repository that exists, counts as absent; every other
+# answer or failure of gh stops with its message.
 function check_release_absent() {
   local tag="${1}"
   local out
   if ! out="$(gh api "repos/${REPO}" --jq='.full_name' 2>&1)"; then
     fail "gh api repos/${REPO}: ${out}"
   fi
-  if out="$(gh release view "${tag}" --repo="${REPO}" --json=tagName 2>&1)"; then
-    fail "release ${tag} exists; a published release is never changed"
+
+  local endpoint="repos/${REPO}/releases/tags/${tag}"
+  local err_file response status=""
+  err_file="$(mktemp)"
+  response="$(gh api --include "${endpoint}" 2>"${err_file}")" || true # the status line decides
+  local err
+  err="$(<"${err_file}")"
+  rm -f "${err_file}"
+  if [[ "${response}" =~ ^HTTP/[0-9.]+\ ([0-9]{3}) ]]; then
+    status="${BASH_REMATCH[1]}"
   fi
-  if [[ "${out}" != "release not found" ]]; then
-    fail "gh release view ${tag}: ${out}"
-  fi
+  case "${status}" in
+  404) ;;
+  200) fail "release ${tag} exists; a published release is never changed" ;;
+  "") fail "gh api ${endpoint}: ${err}" ;;
+  *) fail "gh api ${endpoint}: HTTP ${status}: ${err:-${response}}" ;;
+  esac
 }
 
 # Print the commit of a tag of origin, or nothing when origin has no such tag.
 function origin_tag_commit() {
   local tag="${1}"
   local refs
-  if ! refs="$(git -C "${ROOT_DIR}" ls-remote --tags origin "refs/tags/${tag}" 2>&1)"; then
+  # An annotated tag lists the tag object, and with the second pattern the
+  # commit that it points at as <tag>^{}.
+  if ! refs="$(git -C "${ROOT_DIR}" ls-remote --tags origin "refs/tags/${tag}" "refs/tags/${tag}^{}" 2>&1)"; then
     fail "git ls-remote origin refs/tags/${tag}: ${refs}"
   fi
-  # An annotated tag lists the tag object, then the commit as <tag>^{}.
   local sha ref commit=""
   while read -r sha ref; do
     case "${ref}" in
@@ -255,7 +267,7 @@ main() {
   mapfile -t files < <(jq -r '.archives[].files[]' "${manifest}" | LC_ALL=C sort)
   (cd "${out_dir}" && sha256sum -- "${files[@]}" >SHA256SUMS)
 
-  printf 'Release %s at %s: %d archives\n' "${tag}" "${commit}" "${#files[@]}"
+  printf 'Release %s at %s: %d archives, %d files\n' "${tag}" "${commit}" "$(jq '.archives | length' "${manifest}")" "${#files[@]}"
   jq -r '.archives[] | "  \(.library) \(.version) \(.target): \(.compiler)"' "${manifest}"
   if "${dry_run}"; then
     printf '\nDry run: nothing published\n'
