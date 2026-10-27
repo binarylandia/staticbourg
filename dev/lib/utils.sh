@@ -216,25 +216,6 @@ function package_all() {
 }
 export -f package_all
 
-function fetch_tarball() {
-  local tarball_url="${1}"
-  local dest_dir="${2}"
-  shift 2
-  local tar_params=("$@")
-  mkdir -p "${dest_dir}"
-  case "${tarball_url}" in
-  *.tar.gz | *.tgz) nicely "curl -fsSL '${tarball_url}' | tar -xf - --posix -C '${dest_dir}' ${tar_params[*]} --use-compress-program='pigz -dc -p ${JOBS}'" ;;
-  *.tar.xz | *.txz) nicely "curl -fsSL '${tarball_url}' | tar -xf - --posix -C '${dest_dir}' ${tar_params[*]} --use-compress-program='pixz -dc -p ${JOBS}'" ;;
-  *.tar.zst | *.tzst) nicely "curl -fsSL '${tarball_url}' | tar -xf - --posix -C '${dest_dir}' ${tar_params[*]} --use-compress-program='pzstd -dc -p ${JOBS}'" ;;
-  *.tar.bz2 | *.tbz | *.tb2) nicely "curl -fsSL '${tarball_url}' | tar -xf - --posix -C '${dest_dir}' ${tar_params[*]} --use-compress-program='pbzip2 -dc -p ${JOBS}'" ;;
-  *)
-    echo "Unsupported file format" >&2
-    return 1
-    ;;
-  esac
-}
-export -f fetch_tarball
-
 # Download a source tarball, verify it against its sha256 in a checksums file
 # (lines of "<sha256>  <file name>", keyed by the file name of the URL), and
 # unpack it into a directory without its top-level folder. A missing or
