@@ -28,7 +28,9 @@ if [[ "${triplet}" == *-w64-mingw32 ]]; then
   # <sysroot>/lib/gcc and for the libstdc++ headers in <sysroot>/include/c++, so
   # both link to the folders of the toolchain. clang reads the configuration of
   # the normalized triplet (x86_64-w64-windows-gnu.cfg) and links with GNU ld of
-  # the toolchain and a static libgcc, as the GCC of the toolchain does.
+  # the toolchain. Programs link statically and need only system DLLs. libstdc++
+  # of the toolchain uses the posix threads of winpthreads, which the GCC driver
+  # links by default and the MinGW driver of clang only with -pthread.
   sysroot="${gcc}/${triplet}/sysroot"
   ln -sfn "../../../lib/gcc" "${sysroot}/lib/gcc"
   ln -sfn "../../include/c++" "${sysroot}/include/c++"
@@ -36,7 +38,8 @@ if [[ "${triplet}" == *-w64-mingw32 ]]; then
   printf -- '%s\n' \
     "--sysroot=${sysroot}" \
     "-fuse-ld=bfd" \
-    "-static-libgcc" \
+    "-static" \
+    "-pthread" \
     >"${llvm}/bin/${normalized}.cfg"
 else
   printf -- '%s\n' \
@@ -58,6 +61,8 @@ done
 # The MinGW driver appends .exe to the output name.
 check_dir="$(mktemp -d)"
 printf 'int main(void) { return 0; }\n' | "${llvm}/bin/${triplet}-clang" -x c -o "${check_dir}/check" -
+printf '#include <mutex>\nint main() { std::mutex m; m.lock(); m.unlock(); }\n' |
+  "${llvm}/bin/${triplet}-clang++" -x c++ -o "${check_dir}/check-cxx" -
 if [[ "${triplet}" == *-w64-mingw32 ]]; then
   printf '1 VERSIONINFO\nBEGIN\nEND\n' >"${check_dir}/check.rc"
   "${llvm}/bin/${triplet}-windres" "${check_dir}/check.rc" -O coff -o "${check_dir}/check.res"
