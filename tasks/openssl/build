@@ -91,10 +91,14 @@ pushd "${src_dir}" >/dev/null
     export CXX="ccache ${CXX:-}"
   fi
 
+  # The prefix /usr/local names the engine and module folders that OpenSSL
+  # compiles in (ENGINESDIR, MODULESDIR), so the archives name standard system
+  # folders instead of the build folder; the files install into the build
+  # folder through DESTDIR.
   nicely CROSS_COMPILE='' ./Configure \
     "${platform:?}" \
     "${configure_args[@]}" \
-    --prefix="${install_dir}" \
+    --prefix="/usr/local" \
     --libdir="lib" \
     no-apps \
     no-dso \
@@ -103,7 +107,13 @@ pushd "${src_dir}" >/dev/null
     2>&1 | log "${build_dir}/build.log"
 
   nicely make -s -j"${JOBS}" 2>&1 | log "${build_dir}/build.log"
-  nicely make -s install_sw 2>&1 | log "${build_dir}/build.log"
+  staging_dir="${build_dir}/${NAME}-staging"
+  rm -rf "${staging_dir}"
+  nicely make -s install_sw DESTDIR="${staging_dir}" 2>&1 | log "${build_dir}/build.log"
+  rm -rf "${install_dir}"
+  mkdir -p "$(dirname "${install_dir}")"
+  mv "${staging_dir}/usr/local" "${install_dir}"
+  rm -rf "${staging_dir}"
 
   # The compiled-in paths must not point into the build machine. On Windows the
   # registry lookup of OSSL_WINCTX must be compiled in; OpenSSL_version() of
