@@ -12,7 +12,7 @@ trap "exit" INT
 source "${BASH_SOURCE%/*}/../../dev/lib/utils.sh"
 
 NAME="libxml2"
-VERSION="2.12.9"
+VERSION="2.15.4"
 SOURCE_URL="https://download.gnome.org/sources/libxml2/${VERSION%.*}/libxml2-${VERSION}.tar.xz"
 
 export CROSS_COMPILE="${CROSS_COMPILE:?}"
@@ -44,11 +44,9 @@ pushd "${src_dir}" >/dev/null
     -DBUILD_STATIC_LIBS="ON" \
     \
     -DLIBXML2_WITH_ICONV="OFF" \
-    -DLIBXML2_WITH_LZMA="OFF" \
     -DLIBXML2_WITH_PROGRAMS="OFF" \
     -DLIBXML2_WITH_PYTHON="OFF" \
     -DLIBXML2_WITH_TESTS="OFF" \
-    -DLIBXML2_WITH_ZLIB="OFF" \
     2>&1 | log "${build_dir}/build.log"
 
   nicely cmake --build "build" --parallel="${JOBS}" -- 2>&1 | log "${build_dir}/build.log"
