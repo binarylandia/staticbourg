@@ -36,7 +36,13 @@ pushd "${src_dir}" >/dev/null
   # -D_FILE_OFFSET_BITS=64 keeps the large file support that they enable.
   export CFLAGS="${CFLAGS} -D_FILE_OFFSET_BITS=64"
 
-  make CC="ccache ${CC}" CFLAGS="${CFLAGS}" AR="${AR}" RANLIB="${RANLIB}" LDFLAGS="${LDFLAGS}" PREFIX="${install_dir}" \
+  # ccache does not recognize emcc as a compiler.
+  cc="ccache ${CC}"
+  if [[ "${CROSS_COMPILE}" == wasm32-*-emscripten ]]; then
+    cc="${CC}"
+  fi
+
+  make CC="${cc}" CFLAGS="${CFLAGS}" AR="${AR}" RANLIB="${RANLIB}" LDFLAGS="${LDFLAGS}" PREFIX="${install_dir}" \
     "libbz2.a" -j"${JOBS}" 2>&1 | log "${build_dir}/build.log"
 
   nicely mkdir -p "${install_dir}/"{include,lib/pkgconfig}

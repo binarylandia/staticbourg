@@ -32,7 +32,12 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 
 pushd "${src_dir}" >/dev/null
 {
-  nicely ./configure \
+  configure=(./configure)
+  if [[ "${CROSS_COMPILE}" == wasm32-*-emscripten ]]; then
+    configure=(emconfigure ./configure)
+  fi
+
+  nicely "${configure[*]}" \
     --prefix="${install_dir}" \
     --static \
     2>&1 | log "${build_dir}/build.log"

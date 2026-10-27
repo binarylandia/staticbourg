@@ -32,10 +32,15 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 
 pushd "${src_dir}" >/dev/null
 {
-  export CC="ccache ${CC}"
-  export CXX="ccache ${CXX:-}"
+  configure=(./configure)
+  if [[ "${CROSS_COMPILE}" == wasm32-*-emscripten ]]; then
+    configure=(emconfigure ./configure)
+  else
+    export CC="ccache ${CC}"
+    export CXX="ccache ${CXX:-}"
+  fi
 
-  nicely ./configure \
+  nicely "${configure[*]}" \
     --prefix="${install_dir}" \
     --host="$(autoconf_host "${CROSS_COMPILE}")" \
     --disable-multi-os-directory \

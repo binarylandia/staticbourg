@@ -68,13 +68,24 @@ pushd "${src_dir}" >/dev/null
   aarch64-apple-darwin)
     platform="darwin64-arm64"
     ;;
+  wasm32-*-emscripten)
+    # The generic 32-bit target with C code only. Threads only in the threaded
+    # variant, and no secure heap, which needs mlock.
+    platform="linux-generic32"
+    configure_args+=(no-asm no-secure-memory)
+    if [[ "${VARIANT}" != "mt" ]]; then
+      configure_args+=(no-threads)
+    fi
+    ;;
   x86_64-apple-darwin)
     platform="darwin64-x86_64"
     ;;
   esac
 
-  export CC="ccache ${CC}"
-  export CXX="ccache ${CXX:-}"
+  if [[ "${CROSS_COMPILE}" != wasm32-*-emscripten ]]; then
+    export CC="ccache ${CC}"
+    export CXX="ccache ${CXX:-}"
+  fi
 
   nicely CROSS_COMPILE='' ./Configure \
     "${platform:?}" \

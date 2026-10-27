@@ -32,6 +32,17 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 
 pushd "${src_dir}" >/dev/null
 {
+  # Threads only in the threaded WebAssembly variant, and no loadable modules,
+  # which a WebAssembly module cannot load.
+  threads="ON"
+  modules="ON"
+  if [[ "${CROSS_COMPILE}" == wasm32-*-emscripten ]]; then
+    modules="OFF"
+    if [[ "${VARIANT}" != "mt" ]]; then
+      threads="OFF"
+    fi
+  fi
+
   cmake_configure "." "build" \
     -Wno-dev -Wno-deprecated \
     -DCMAKE_INSTALL_PREFIX="${install_dir}" \
@@ -44,6 +55,8 @@ pushd "${src_dir}" >/dev/null
     -DBUILD_STATIC_LIBS="ON" \
     \
     -DLIBXML2_WITH_ICONV="OFF" \
+    -DLIBXML2_WITH_MODULES="${modules}" \
+    -DLIBXML2_WITH_THREADS="${threads}" \
     -DLIBXML2_WITH_PROGRAMS="OFF" \
     -DLIBXML2_WITH_PYTHON="OFF" \
     -DLIBXML2_WITH_TESTS="OFF" \

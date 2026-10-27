@@ -38,7 +38,7 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 pushd "${src_dir}" >/dev/null
 {
   multithread="ON"
-  if [[ "${CROSS_COMPILE}" == wasm32-*-emscripten ]]; then
+  if [[ "${CROSS_COMPILE}" == wasm32-*-emscripten && "${VARIANT}" != "mt" ]]; then
     multithread="OFF"
   fi
 
