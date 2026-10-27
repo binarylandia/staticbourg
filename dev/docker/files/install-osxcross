@@ -15,7 +15,7 @@ set -euxo pipefail
 
 dest="${1:?prefix}"
 llvm="${2:?llvm prefix}"
-build_time="2026-10-18_09-15-29"
+build_time="2026-10-27_18-18-20"
 release="osxcross-27d21e4-sdk11.1-${build_time}"
 archive="/tmp/osxcross.tar.zst"
 mkdir -p "${dest}"
