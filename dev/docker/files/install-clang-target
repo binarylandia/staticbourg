@@ -27,17 +27,19 @@ if [[ "${triplet}" == *-w64-mingw32 ]]; then
   # The MinGW driver of clang ignores --gcc-install-dir and looks for GCC in
   # <sysroot>/lib/gcc and for the libstdc++ headers in <sysroot>/include/c++, so
   # both link to the folders of the toolchain. clang reads the configuration of
-  # the normalized triplet (x86_64-w64-windows-gnu.cfg) and links with GNU ld of
-  # the toolchain. Programs link statically and need only system DLLs. libstdc++
-  # of the toolchain uses the posix threads of winpthreads, which the GCC driver
-  # links by default and the MinGW driver of clang only with -pthread.
+  # the normalized triplet (x86_64-w64-windows-gnu.cfg) and links with lld: GNU
+  # ld of the toolchain links large Rust programs, such as wasm-bindgen, into
+  # executables that jump to an unrelocated address at start. Programs link
+  # statically and need only system DLLs. libstdc++ of the toolchain uses the
+  # posix threads of winpthreads, which the GCC driver links by default and the
+  # MinGW driver of clang only with -pthread.
   sysroot="${gcc}/${triplet}/sysroot"
   ln -sfn "../../../lib/gcc" "${sysroot}/lib/gcc"
   ln -sfn "../../include/c++" "${sysroot}/include/c++"
   normalized="$("${llvm}/bin/clang" --target="${triplet}" -print-target-triple)"
   printf -- '%s\n' \
     "--sysroot=${sysroot}" \
-    "-fuse-ld=bfd" \
+    "-fuse-ld=lld" \
     "-static" \
     "-pthread" \
     >"${llvm}/bin/${normalized}.cfg"
