@@ -10,7 +10,9 @@
 # toolchain, its GCC installation (crt files, libgcc, libstdc++), and lld. The
 # <triplet>-ar, -nm, -ranlib, -strip, -objcopy, and -readelf links to the LLVM
 # tools serve build systems that look for the binary tools of the target by
-# their prefixed names, such as the configure script of jemalloc.
+# their prefixed names, such as the configure script of jemalloc. MinGW targets
+# also get <triplet>-windres and -dlltool links to llvm-windres and llvm-dlltool,
+# which CMake and libtool call for resource files and import libraries.
 #
 set -euxo pipefail
 
@@ -45,11 +47,19 @@ else
 fi
 ln -sf clang "${llvm}/bin/${triplet}-clang"
 ln -sf clang++ "${llvm}/bin/${triplet}-clang++"
-for tool in ar nm ranlib strip objcopy readelf; do
+tools=(ar nm ranlib strip objcopy readelf)
+if [[ "${triplet}" == *-w64-mingw32 ]]; then
+  tools+=(windres dlltool)
+fi
+for tool in "${tools[@]}"; do
   ln -sf "llvm-${tool}" "${llvm}/bin/${triplet}-${tool}"
 done
 
 # The MinGW driver appends .exe to the output name.
 check_dir="$(mktemp -d)"
 printf 'int main(void) { return 0; }\n' | "${llvm}/bin/${triplet}-clang" -x c -o "${check_dir}/check" -
+if [[ "${triplet}" == *-w64-mingw32 ]]; then
+  printf '1 VERSIONINFO\nBEGIN\nEND\n' >"${check_dir}/check.rc"
+  "${llvm}/bin/${triplet}-windres" "${check_dir}/check.rc" -O coff -o "${check_dir}/check.res"
+fi
 rm -rf "${check_dir}"
