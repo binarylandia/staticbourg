@@ -11,9 +11,18 @@ function build() {
   local name="${1:?}"
   declare -x TASK="${name}"
   declare -x CROSS_COMPILE="${2:-${CROSS_COMPILE:?}}"
+  declare -x VARIANT="${VARIANT:-plain}"
+  if [[ "${VARIANT}" != "plain" && "${CROSS_COMPILE}" != wasm32-* ]]; then
+    err "The ${VARIANT} variant exists for WebAssembly only, not for ${CROSS_COMPILE}"
+    return 1
+  fi
+  local variant_dir="${CROSS_COMPILE}"
+  if [[ "${VARIANT}" != "plain" ]]; then
+    variant_dir+="-${VARIANT}"
+  fi
   declare -x BUILD_TIME="${BUILD_TIME:-"$(datetime_safe)"}"
-  declare -x BUILD_DIR="${BUILD_DIR:-"$(project_root)/.build/${CROSS_COMPILE}"}"
-  declare -x INSTALL_DIR="${INSTALL_DIR:-"$(project_root)/.install/${CROSS_COMPILE}/${BUILD_TIME}/${name}"}"
+  declare -x BUILD_DIR="${BUILD_DIR:-"$(project_root)/.build/${variant_dir}"}"
+  declare -x INSTALL_DIR="${INSTALL_DIR:-"$(project_root)/.install/${variant_dir}/${BUILD_TIME}/${name}"}"
   declare -x OUT_DIR="${OUT_DIR:-"$(project_root)/.out/${BUILD_TIME}"}"
 
   # The binary tools of the target that its image names (CC_<target> and so on).
@@ -77,6 +86,11 @@ function build() {
     sysroot=""
     ldflags=""
     unset CMAKE_C_COMPILER_LAUNCHER CMAKE_CXX_COMPILER_LAUNCHER
+    # The mt variant: objects with atomics and bulk memory for modules with
+    # threads, and the pthread API of Emscripten for the libraries that use it.
+    if [[ "${VARIANT}" == "mt" ]]; then
+      opt_flags+=" -pthread"
+    fi
   fi
 
   local common_flags

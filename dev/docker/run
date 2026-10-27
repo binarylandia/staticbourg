@@ -153,6 +153,7 @@ docker run --rm $(tty -s && echo "-it") \
   --env="GROUP=${GROUP}" \
   --env="BUILD_TIME=${BUILD_TIME:-}" \
   --env="CROSS_COMPILE=${CROSS_COMPILE:-}" \
+  --env="VARIANT=${VARIANT:-plain}" \
   --env="BUILD_COMMIT=${build_commit}" \
   --env="BUILD_DIRTY=${build_dirty}" \
   --env="DOCKERFILE=${dockerfile}" \

@@ -6,7 +6,8 @@ trap "exit" INT
 source "${BASH_SOURCE%/*}/../lib/utils.sh"
 
 # The targets of a plain run. wasm32-unknown-emscripten builds only on request
-# (--target=wasm32-unknown-emscripten), because only some tasks support it.
+# (--target=wasm32-unknown-emscripten), each task in every variant of
+# WASM_VARIANTS, and by default the tasks of WASM_TASKS.
 targets=("${NATIVE_TARGETS[@]}")
 
 export BUILD_TIME="${BUILD_TIME:-$(datetime_safe)}"
@@ -22,11 +23,17 @@ function build_one_name() {
   declare -x CROSS_COMPILE="${CROSS_COMPILE:?}"
   declare -x BUILD_TIME="${BUILD_TIME:?}"
 
-  info "Building '${name}' for '${CROSS_COMPILE}'"
-  ./dev/docker/run ./dev/cross/build "${name}" || {
-    err "Build failed: '${name}' for ${CROSS_COMPILE}"
-    return 1
-  }
+  local variants=("plain") variant
+  if [[ "${CROSS_COMPILE}" == "${WASM_TARGET}" ]]; then
+    variants=("${WASM_VARIANTS[@]}")
+  fi
+  for variant in "${variants[@]}"; do
+    info "Building '${name}' (${variant}) for '${CROSS_COMPILE}'"
+    VARIANT="${variant}" ./dev/docker/run ./dev/cross/build "${name}" || {
+      err "Build failed: '${name}' (${variant}) for ${CROSS_COMPILE}"
+      return 1
+    }
+  done
 }
 export -f build_one_name
 
@@ -42,7 +49,11 @@ function run_one() {
     build_one_name "${name}"
   else
     local names=() task_name
-    mapfile -t names < <(task_names "${PROJECT_ROOT:?}")
+    if [[ "${CROSS_COMPILE}" == "${WASM_TARGET}" ]]; then
+      names=("${WASM_TASKS[@]}")
+    else
+      mapfile -t names < <(task_names "${PROJECT_ROOT:?}")
+    fi
     if ((${#names[@]} == 0)); then
       err "No tasks found in ${PROJECT_ROOT}/tasks"
       return 1

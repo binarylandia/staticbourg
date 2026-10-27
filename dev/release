@@ -5,7 +5,7 @@
 # Publish the archives of .out/<build time>/ as the GitHub release <build time>
 # of binarylandia/staticbourg. Run it on the host that built them, with gh
 # signed in, after one build of every task and target with that BUILD_TIME
-# (dev/cross/all, and dev/cross/all --target=wasm32-unknown-emscripten lzma zstd).
+# (dev/cross/all, and dev/cross/all --target=wasm32-unknown-emscripten).
 #
 # The release:
 #   - is named after the build time, for example 2026-10-21_13-40-13, and has no
@@ -14,8 +14,9 @@
 #     branch of origin (binarylandia/staticbourg on GitHub). A tag of that name
 #     that origin already has must point at the same commit
 #   - carries the full set of archives: every task for every native target, and
-#     the WebAssembly tasks for wasm32-unknown-emscripten (NATIVE_TARGETS,
-#     WASM_TASKS in dev/lib/utils.sh), each as .tar.xz, .tar.gz, and .tar.zst
+#     the WebAssembly tasks for wasm32-unknown-emscripten in the plain and mt
+#     variants (NATIVE_TARGETS, WASM_TASKS, WASM_VARIANTS in dev/lib/utils.sh),
+#     each as .tar.xz, .tar.gz, and .tar.zst
 #     (<library>-<version>-static-<target>-<build time>.tar.{xz,gz,zst}),
 #     SHA256SUMS, and manifest.json with the build record of every archive
 #     (library, version, source and its sha256, target, compiler, the LLVM
@@ -78,32 +79,36 @@ function check_commit() {
 }
 
 # Fail unless the build records cover the full set of archives once each: every
-# task for every native target, and the WebAssembly tasks for WASM_TARGET.
+# task for every native target, and the WebAssembly tasks for WASM_TARGET in
+# every variant of WASM_VARIANTS.
 function check_matrix() {
   local records=("$@")
   local task target expected actual
   expected="$(
     while IFS= read -r task; do
       for target in "${NATIVE_TARGETS[@]}"; do
-        printf '%s %s\n' "${task}" "${target}"
+        printf '%s %s plain\n' "${task}" "${target}"
       done
     done < <(task_names "${ROOT_DIR}")
+    local variant
     for task in "${WASM_TASKS[@]}"; do
-      printf '%s %s\n' "${task}" "${WASM_TARGET}"
+      for variant in "${WASM_VARIANTS[@]}"; do
+        printf '%s %s %s\n' "${task}" "${WASM_TARGET}" "${variant}"
+      done
     done
   )"
   expected="$(LC_ALL=C sort <<<"${expected}")"
-  actual="$(jq -r '"\(.task) \(.target)"' "${records[@]}" | LC_ALL=C sort)"
+  actual="$(jq -r '"\(.task) \(.target) \(.variant)"' "${records[@]}" | LC_ALL=C sort)"
 
   local missing extra duplicate
   missing="$(LC_ALL=C comm -23 <(printf '%s\n' "${expected}") <(printf '%s\n' "${actual}" | uniq))"
   extra="$(LC_ALL=C comm -13 <(printf '%s\n' "${expected}") <(printf '%s\n' "${actual}" | uniq))"
   duplicate="$(uniq -d <<<"${actual}")"
-  [[ -z "${missing}" ]] || fail "no archives of these tasks and targets:
+  [[ -z "${missing}" ]] || fail "no archives of these tasks, targets, and variants:
 ${missing}"
-  [[ -z "${extra}" ]] || fail "archives of tasks and targets outside the release set:
+  [[ -z "${extra}" ]] || fail "archives of tasks, targets, and variants outside the release set:
 ${extra}"
-  [[ -z "${duplicate}" ]] || fail "more than one build record for these tasks and targets:
+  [[ -z "${duplicate}" ]] || fail "more than one build record for these tasks, targets, and variants:
 ${duplicate}"
 }
 
@@ -260,7 +265,7 @@ main() {
 
   local manifest="${out_dir}/manifest.json"
   jq -s --arg repository "${REPO}" --arg commit "${commit}" --arg build_time "${build_time}" \
-    '{repository: $repository, commit: $commit, build_time: $build_time, archives: (sort_by(.library, .target))}' \
+    '{repository: $repository, commit: $commit, build_time: $build_time, archives: (sort_by(.library, .target, .variant))}' \
     "${records[@]}" >"${manifest}"
 
   local files=()
@@ -268,7 +273,7 @@ main() {
   (cd "${out_dir}" && sha256sum -- "${files[@]}" >SHA256SUMS)
 
   printf 'Release %s at %s: %d archives, %d files\n' "${tag}" "${commit}" "$(jq '.archives | length' "${manifest}")" "${#files[@]}"
-  jq -r '.archives[] | "  \(.library) \(.version) \(.target): \(.compiler)"' "${manifest}"
+  jq -r '.archives[] | "  \(.library) \(.version) \(.target) \(.variant): \(.compiler)"' "${manifest}"
   if "${dry_run}"; then
     printf '\nDry run: nothing published\n'
     return

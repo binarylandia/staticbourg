@@ -5,9 +5,10 @@ export JOBS="${JOBS:=$(($(nproc --all) + 2))}"
 export NICE="nice -14 ionice -c2 -n3"
 
 # The targets that every task builds for, and the tasks that also build for
-# WebAssembly. dev/cross/all builds the native targets unless --target names
-# others, and dev/release publishes only the full set: every task for every
-# native target, and the WebAssembly tasks for WASM_TARGET.
+# WebAssembly, in each of the WebAssembly variants. dev/cross/all builds the
+# native targets unless --target names others, and dev/release publishes only
+# the full set: every task for every native target, and the WebAssembly tasks
+# for WASM_TARGET in every variant of WASM_VARIANTS.
 # shellcheck disable=SC2034 # used by the scripts that source this file
 NATIVE_TARGETS=(
   "x86_64-unknown-linux-gnu"
@@ -23,7 +24,13 @@ NATIVE_TARGETS=(
 # shellcheck disable=SC2034 # used by the scripts that source this file
 WASM_TARGET="wasm32-unknown-emscripten"
 # shellcheck disable=SC2034 # used by the scripts that source this file
-WASM_TASKS=("lzma" "zstd")
+WASM_TASKS=("bzip2" "libffi" "lzma" "openssl" "xml2" "zlib" "zstd")
+# The variants of the WebAssembly archives: plain for modules without threads,
+# and mt, compiled with -pthread (atomics and bulk memory), for modules with
+# threads, because wasm-ld rejects the objects of the plain variant in a link
+# with shared memory. The native targets build the plain variant only.
+# shellcheck disable=SC2034 # used by the scripts that source this file
+WASM_VARIANTS=("plain" "mt")
 
 function print_color() {
   local color_code="${1}"
@@ -284,7 +291,9 @@ function install_target_info() {
 export -f install_target_info
 
 # Package an installed library with its build record, as
-# <out dir>/<library>-<version>-static-<target>-<build time>.tar.{xz,gz,zst}.
+# <out dir>/<library>-<version>-static-<target>-<build time>.tar.{xz,gz,zst},
+# and the mt variant (VARIANT=mt) as
+# <out dir>/<library>-<version>-static-mt-<target>-<build time>.tar.{xz,gz,zst}.
 # The build record goes into the archives as share/staticbourg/build.json and
 # next to them as <archive name>.json, which dev/release collects into the
 # manifest of a release. It holds the library fields given here and the
@@ -293,6 +302,7 @@ export -f install_target_info
 #     without the extension, the task (tasks/<task>/build), and the library with
 #     its source tarball
 #   kind: "native", or "wasm" for WebAssembly
+#   variant: "plain", or "mt" for the WebAssembly archives with threads
 #   target, compiler: the target, and the first line of `$CC --version`
 #   llvm: the binarylandia/build_llvm release of the image (native only)
 #   target_toolchain: {url, sha256} of the toolchain archive of the target (GCC,
@@ -313,8 +323,12 @@ function package_with_record() {
   local version="${4:?version}"
   local source="${5:?source url}"
   local source_sha256="${6:?source sha256}"
-  local name
-  name="${library}-${version}-static-$(package_target_name "${CROSS_COMPILE:?}")-${BUILD_TIME:?}"
+  local variant="${VARIANT:-plain}"
+  local name="${library}-${version}-static"
+  if [[ "${variant}" != "plain" ]]; then
+    name+="-${variant}"
+  fi
+  name+="-$(package_target_name "${CROSS_COMPILE:?}")-${BUILD_TIME:?}"
 
   install_target_info "${install_dir}"
   local record="${install_dir}/share/staticbourg/build.json"
@@ -326,10 +340,12 @@ function package_with_record() {
     --arg version "${version}" \
     --arg source "${source}" \
     --arg source_sha256 "${source_sha256}" \
+    --arg variant "${variant}" \
     --argjson toolchain "${BUILD_RECORD:?}" \
     --arg cflags "${CFLAGS:?}" \
     '{name: $name, task: $task, library: $library, version: $version, source: $source, source_sha256: $source_sha256}
       + $toolchain
+      + {variant: $variant}
       + {cflags: $cflags}
       + {files: ["tar.xz", "tar.gz", "tar.zst"] | map("\($name).\(.)")}' \
     >"${record}"
