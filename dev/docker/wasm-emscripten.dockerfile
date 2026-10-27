@@ -33,6 +33,7 @@ RUN set -euxo pipefail >/dev/null \
   make \
   parallel \
   patch \
+  perl \
   pbzip2 \
   pigz \
   pixz \
