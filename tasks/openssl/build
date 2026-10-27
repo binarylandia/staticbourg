@@ -6,9 +6,20 @@
 # checksum-verified release tarball, and package them. dev/cross/build sets the
 # environment.
 #
-# OpenSSL 3.4 has no MinGW target for arm64. aarch64-pc-windows-gnullvm builds
+# OpenSSL 3.5 has no MinGW target for arm64. aarch64-pc-windows-gnullvm builds
 # with mingwarm64 of mingwarm64.conf: the MinGW settings of mingw64 without
 # assembly.
+#
+# The libraries look up their configuration file and the default trust store
+# (cert.pem and certs/) in OPENSSLDIR, which is compiled in. On Linux and macOS
+# it is /etc/ssl, where Debian, Ubuntu, Alpine, Arch, openSUSE, and macOS keep
+# their trust store; other systems point SSL_CERT_FILE or SSL_CERT_DIR at
+# theirs. On Windows no compiled-in folder is safe, because any user can create
+# a folder such as C:\etc\ssl and put a configuration or a CA certificate
+# there. The Windows libraries read OPENSSLDIR from the registry key
+# HKLM\SOFTWARE\WOW6432Node\OpenSSL-3.5-binarylandia instead (OSSL_WINCTX),
+# which only administrators can write; without the key they load no
+# configuration and trust no default store.
 #
 # shellcheck disable=SC2155
 set -euo pipefail
@@ -17,7 +28,7 @@ trap "exit" INT
 source "${BASH_SOURCE%/*}/../../dev/lib/utils.sh"
 
 NAME="openssl"
-VERSION="3.4.0"
+VERSION="3.5.9"
 SOURCE_URL="https://github.com/openssl/openssl/releases/download/openssl-${VERSION}/openssl-${VERSION}.tar.gz"
 
 export CROSS_COMPILE="${CROSS_COMPILE:?}"
@@ -38,7 +49,7 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 pushd "${src_dir}" >/dev/null
 {
   # Run `./Configure LIST` to display all possible platforms
-  configure_args=()
+  configure_args=(--openssldir="/etc/ssl")
   case "${CROSS_COMPILE}" in
   x86_64-unknown-linux-*)
     platform="linux-x86_64"
@@ -48,10 +59,11 @@ pushd "${src_dir}" >/dev/null
     ;;
   x86_64-pc-windows-gnu | x86_64-pc-windows-gnullvm)
     platform="mingw64"
+    configure_args=(-DOSSL_WINCTX=binarylandia)
     ;;
   aarch64-pc-windows-gnullvm)
     platform="mingwarm64"
-    configure_args+=(--config="${task_dir}/mingwarm64.conf" no-asm)
+    configure_args=(-DOSSL_WINCTX=binarylandia --config="${task_dir}/mingwarm64.conf" no-asm)
     ;;
   aarch64-apple-darwin)
     platform="darwin64-arm64"
@@ -69,7 +81,6 @@ pushd "${src_dir}" >/dev/null
     "${configure_args[@]}" \
     --prefix="${install_dir}" \
     --libdir="lib" \
-    --openssldir="${install_dir}/etc/openssl" \
     no-apps \
     no-dso \
     no-engine \
@@ -78,6 +89,16 @@ pushd "${src_dir}" >/dev/null
 
   nicely make -s -j"${JOBS}" 2>&1 | log "${build_dir}/build.log"
   nicely make -s install_sw 2>&1 | log "${build_dir}/build.log"
+
+  # The compiled-in paths must not point into the build machine.
+  case "${CROSS_COMPILE}" in
+  *-windows-*) expected='OSSL_WINCTX: "binarylandia"' ;;
+  *) expected='OPENSSLDIR: "/etc/ssl"' ;;
+  esac
+  if ! grep -aqF "${expected}" "${install_dir}/lib/libcrypto.a"; then
+    printf 'libcrypto.a of %s lacks %s\n' "${CROSS_COMPILE}" "${expected}" >&2
+    exit 1
+  fi
 
   sed -i'' -e "s|^prefix=.*|prefix=\$\{pcfiledir\}/../..|g" "${install_dir}/lib/pkgconfig/libcrypto.pc"
   sed -i'' -e "s|^prefix=.*|prefix=\$\{pcfiledir\}/../..|g" "${install_dir}/lib/pkgconfig/libssl.pc"
