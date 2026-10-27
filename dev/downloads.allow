@@ -1,0 +1,5 @@
+# Files that download, each verifying what it downloads (see dev/check-downloads)
+dev/docker/files/fetch               verifies each download against dev/docker/files/checksums
+dev/lib/utils.sh                     fetch_verified_tarball verifies each source against tasks/<task>/checksums
+dev/docker/wasm-emscripten.dockerfile verifies Node and Emscripten against NODE_SHA256 and EMSCRIPTEN_SHA256
+dev/release                          fetches the refs of origin to check that the commit is pushed
