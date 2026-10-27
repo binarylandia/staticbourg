@@ -7,8 +7,8 @@
 #
 # - Legacy format support from v0.1 (ZSTD_LEGACY_LEVEL=1), as the zstd-sys
 #   crate builds it
-# - WebAssembly builds have no threads: a module without -pthread cannot link
-#   objects that use them
+# - Multithreaded compression except in the plain WebAssembly variant: a module
+#   without -pthread cannot link objects that use threads
 #
 # shellcheck disable=SC2155
 set -euo pipefail

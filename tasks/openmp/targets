@@ -1,0 +1,9 @@
+# The OpenMP runtime of LLVM has no static library for Windows, so the Windows
+# targets get no archive; Windows programs with OpenMP link libgomp of the MinGW
+# GCC instead.
+x86_64-unknown-linux-gnu
+x86_64-unknown-linux-musl
+aarch64-unknown-linux-gnu
+aarch64-unknown-linux-musl
+aarch64-apple-darwin
+x86_64-apple-darwin
