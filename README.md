@@ -66,6 +66,13 @@ Each archive contains `share/staticbourg/build.json`, and the release carries th
 - `dockerfile`, `dockerfile_sha256`, `build_commit`, `build_dirty`, `build_time`: the build image file, the commit of this repository, whether the checkout had uncommitted or untracked files, and the build time
 - `files`: the archive files
 
+## OpenSSL paths
+
+OpenSSL finds its configuration file and the default trust store (`cert.pem` and `certs/`) in a folder that is compiled into libcrypto:
+
+- **Linux and macOS**: `/etc/ssl`, where Debian, Ubuntu, Alpine, Arch, openSUSE, and macOS keep their trust store. On other systems, set `SSL_CERT_FILE` or `SSL_CERT_DIR`, or load the CA certificates in the program
+- **Windows**: the folder that the registry value `HKLM\SOFTWARE\WOW6432Node\OpenSSL-3.5-binarylandia\OPENSSLDIR` names (`OSSL_WINCTX`), which only administrators can write. Without the value, OpenSSL loads no configuration file and trusts no default store, so programs load their CA certificates themselves. A folder compiled into the library would let any user plant a configuration or a CA certificate, because users can create folders such as `C:\etc\ssl`
+
 ## Features
 
 - Static libraries with -fPIC for flexible linking
