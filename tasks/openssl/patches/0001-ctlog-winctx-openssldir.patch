@@ -1,0 +1,34 @@
+Defect: with OSSL_WINCTX, OpenSSL on Windows reads OPENSSLDIR from the registry for the configuration file and the default certificates, but CTLOG_STORE_load_default_file still opens the CT log list in the OPENSSLDIR of the build (CTLOG_FILE), a folder that any Windows user can create, such as C:\workdir\...\ssl. A user who plants ct_log_list.cnf there chooses the CT logs that programs trust.
+Upstream status: not reported upstream yet; this patch takes the CT log list from the OPENSSLDIR of the registry key, as the configuration file.
+Version-bump check: build the Windows targets and confirm that the build check of tasks/openssl/build finds no build folder in libcrypto.a; drop this patch when ct_log.c uses ossl_get_openssldir() under OSSL_WINCTX.
+
+--- a/crypto/ct/ct_log.c
++++ b/crypto/ct/ct_log.c
+@@ -161,9 +161,26 @@
+ int CTLOG_STORE_load_default_file(CTLOG_STORE *store)
+ {
+     const char *fpath = ossl_safe_getenv(CTLOG_FILE_EVP);
++#if defined(_WIN32) && defined(OSSL_WINCTX)
++    char default_path[1024];
++#endif
+ 
+-    if (fpath == NULL)
++    if (fpath == NULL) {
++#if defined(_WIN32) && defined(OSSL_WINCTX)
++        /*
++         * The CT log list lies in the OPENSSLDIR of the registry key, like the
++         * configuration file, not in the OPENSSLDIR of the build.
++         */
++        const char *dir = ossl_get_openssldir();
++
++        if (dir == NULL || dir[0] == '\0')
++            return 0;
++        BIO_snprintf(default_path, sizeof(default_path), "%s/ct_log_list.cnf", dir);
++        fpath = default_path;
++#else
+         fpath = CTLOG_FILE;
++#endif
++    }
+ 
+     return CTLOG_STORE_load_file(store, fpath);
+ }

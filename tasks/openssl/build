@@ -19,10 +19,8 @@
 # there. The Windows libraries read OPENSSLDIR from the registry key
 # HKLM\SOFTWARE\WOW6432Node\OpenSSL-3.5-binarylandia instead (OSSL_WINCTX),
 # which only administrators can write; without the key they load no
-# configuration and trust no default store. The few paths that OpenSSL still
-# compiles in on Windows, such as the default CT log list, lie in
-# C:/Program Files/Common Files/SSL, which only administrators can create, as
-# in the MinGW builds of OpenSSL itself.
+# configuration and trust no default store. patches/ makes the default CT log
+# list follow the registry key as well.
 #
 # shellcheck disable=SC2155
 set -euo pipefail
@@ -51,10 +49,11 @@ fetch_verified_tarball "${SOURCE_URL}" "${task_dir}/checksums" "${src_dir}"
 
 pushd "${src_dir}" >/dev/null
 {
+  for patch_file in "${task_dir}/patches/"*.patch; do
+    nicely patch --fuzz=0 -p1 -i "${patch_file}" 2>&1 | log "${build_dir}/build.log"
+  done
   # Run `./Configure LIST` to display all possible platforms
   configure_args=(--openssldir="/etc/ssl")
-  # nicely runs the command through `bash -c`, so an argument with spaces carries
-  # its own quotes.
   case "${CROSS_COMPILE}" in
   x86_64-unknown-linux-*)
     platform="linux-x86_64"
@@ -64,11 +63,11 @@ pushd "${src_dir}" >/dev/null
     ;;
   x86_64-pc-windows-gnu | x86_64-pc-windows-gnullvm)
     platform="mingw64"
-    configure_args=("--openssldir='C:/Program Files/Common Files/SSL'" -DOSSL_WINCTX=binarylandia)
+    configure_args=(-DOSSL_WINCTX=binarylandia)
     ;;
   aarch64-pc-windows-gnullvm)
     platform="mingwarm64"
-    configure_args=("--openssldir='C:/Program Files/Common Files/SSL'" -DOSSL_WINCTX=binarylandia --config="${task_dir}/mingwarm64.conf" no-asm)
+    configure_args=(-DOSSL_WINCTX=binarylandia --config="${task_dir}/mingwarm64.conf" no-asm)
     ;;
   aarch64-apple-darwin)
     platform="darwin64-arm64"

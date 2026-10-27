@@ -71,7 +71,7 @@ Each archive contains `share/staticbourg/build.json`, and the release carries th
 OpenSSL finds its configuration file and the default trust store (`cert.pem` and `certs/`) in a folder that is compiled into libcrypto:
 
 - **Linux and macOS**: `/etc/ssl`, where Debian, Ubuntu, Alpine, Arch, openSUSE, and macOS keep their trust store. On other systems, set `SSL_CERT_FILE` or `SSL_CERT_DIR`, or load the CA certificates in the program
-- **Windows**: the folder that the registry value `HKLM\SOFTWARE\WOW6432Node\OpenSSL-3.5-binarylandia\OPENSSLDIR` names (`OSSL_WINCTX`), which only administrators can write. Without the value, OpenSSL loads no configuration file and trusts no default store, so programs load their CA certificates themselves. The paths that OpenSSL still compiles in, such as the default CT log list, lie in `C:/Program Files/Common Files/SSL`, which only administrators can create. A folder compiled into the library would let any user plant a configuration or a CA certificate, because users can create folders such as `C:\etc\ssl`
+- **Windows**: the folder that the registry value `HKLM\SOFTWARE\WOW6432Node\OpenSSL-3.5-binarylandia\OPENSSLDIR` names (`OSSL_WINCTX`), which only administrators can write. Without the value, OpenSSL loads no configuration file and trusts no default store, so programs load their CA certificates themselves. The default CT log list follows the same registry value (a patch of the task). A folder compiled into the library would let any user plant a configuration or a CA certificate, because users can create folders such as `C:\etc\ssl`
 
 ## Features
 
