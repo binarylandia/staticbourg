@@ -5,13 +5,13 @@
 ## Build
 
 ```bash
-./dev/cross/all zlib lzma bzip2 zstd
+./dev/cross/all
 ```
 
-WebAssembly (`lzma` and `zstd` only):
+WebAssembly, every library except openmp, in the plain and the threaded (`mt`) variant:
 
 ```bash
-./dev/cross/all --target=wasm32-unknown-emscripten lzma zstd
+./dev/cross/all --target=wasm32-unknown-emscripten
 ```
 
 `--target=<triple>` selects targets, and `--serial` builds one target at a time. The archives go to `.out/<build time>/`; set `BUILD_TIME` to give several runs one build time.
@@ -25,7 +25,7 @@ One build of every task and target with one `BUILD_TIME`, then:
 ./dev/release <build time>
 ```
 
-`dev/release` checks that the archives are the full set (every task for every native target, and lzma and zstd for `wasm32-unknown-emscripten`, each in the three formats), that every archive comes from a clean build of `HEAD`, that a branch of `origin` (`binarylandia/staticbourg`) has `HEAD`, and that no release or other commit has the tag `<build time>`. Then it publishes the release `<build time>` with the archives, `SHA256SUMS`, and `manifest.json`.
+`dev/release` checks that the archives are the full set (every task for each of its native targets, and every WebAssembly task for `wasm32-unknown-emscripten` in both variants, each in the three formats), that every archive comes from a clean build of `HEAD`, that a branch of `origin` (`binarylandia/staticbourg`) has `HEAD`, and that no release or other commit has the tag `<build time>`. Then it publishes the release `<build time>` with the archives, `SHA256SUMS`, and `manifest.json`.
 
 ## What is this?
 
@@ -56,6 +56,7 @@ Each archive contains `share/staticbourg/build.json`, and the release carries th
 
 - `name`, `task`, `library`, `version`, `source`, `source_sha256`: the archive, the task (`tasks/<task>/build`), and the library with its source tarball
 - `kind`: `native`, or `wasm`
+- `variant`: `plain`, or `mt` for the WebAssembly archives with threads
 - `target`, `compiler`: the target, and the first line of `$CC --version`
 - `llvm`: the `binarylandia/build_llvm` release of the build image (native targets)
 - `target_toolchain`: `url` and `sha256` of the GCC, osxcross, llvm-mingw, or Emscripten archive of the target
@@ -79,7 +80,8 @@ OpenSSL finds its configuration file and the default trust store (`cert.pem` and
 - Optimized builds (-O3, vectorization, loop unrolling)
 - Sources downloaded from the upstream releases and verified by sha256 (`tasks/<name>/checksums`)
 - Multiple compression formats (xz, gzip, zstd)
-- WebAssembly archives of lzma and zstd for Emscripten, built with `emcc` and without threads. Emscripten has no ABI guarantee between versions, so these archives link only with the Emscripten version in their name (`wasm32-unknown-emscripten.6.0.13`), which `share/emscripten-version.txt` also records
+- WebAssembly archives of every library except openmp for Emscripten, built with `emcc`: the plain variant without threads, and the `mt` variant (`<library>-<version>-static-mt-...`) compiled with `-pthread` for modules with threads, because wasm-ld rejects the objects of the plain variant in a link with shared memory. Emscripten has no ABI guarantee between versions, so these archives link only with the Emscripten version in their name (`wasm32-unknown-emscripten.6.0.13`), which `share/emscripten-version.txt` also records
+- openmp: the static OpenMP runtime of LLVM (`libomp.a`, `omp.h`, `openmp.pc`) for the Linux and macOS targets, the same LLVM version as the clang of the images. clang compiles `-fopenmp` code into calls of this runtime. LLVM builds no static libomp for Windows, so the Windows targets have no openmp archive (`tasks/openmp/targets`)
 
 ## Use Cases
 
