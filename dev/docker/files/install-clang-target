@@ -49,5 +49,7 @@ for tool in ar nm ranlib strip objcopy readelf; do
   ln -sf "llvm-${tool}" "${llvm}/bin/${triplet}-${tool}"
 done
 
-printf 'int main(void) { return 0; }\n' | "${llvm}/bin/${triplet}-clang" -x c -o /tmp/clang-target-check -
-rm /tmp/clang-target-check
+# The MinGW driver appends .exe to the output name.
+check_dir="$(mktemp -d)"
+printf 'int main(void) { return 0; }\n' | "${llvm}/bin/${triplet}-clang" -x c -o "${check_dir}/check" -
+rm -rf "${check_dir}"
