@@ -15,8 +15,8 @@ set -euxo pipefail
 triplet="${1:?triplet}"
 dest="${2:?prefix}"
 version="16.2.0"
-build_time="2026-10-18_08-33-54"
-release="gcc-15.3.0_${version}-${build_time}"
+build_time="2026-10-27_02-49-55"
+release="gcc-12.5.0_14.4.0_15.3.0_${version}-${build_time}"
 archive="/tmp/gcc-cross.tar.xz"
 mkdir -p "${dest}"
 

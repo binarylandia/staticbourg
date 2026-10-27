@@ -2,7 +2,7 @@
 # check=experimental=all
 #
 # Build image of a Windows target with the Universal C Runtime
-# (*-pc-windows-gnullvm). The llvm-mingw toolchain of LLVM 22 compiles and links
+# (*-pc-windows-gnullvm). The llvm-mingw toolchain of LLVM 23 compiles and links
 # for the target: clang and lld on the static mingw-w64 sysroot with UCRT,
 # compiler-rt, and libunwind. clang compiles and links for the build machine on
 # the glibc 2.17 sysroot of a crosstool-NG GCC 16 toolchain. These are the

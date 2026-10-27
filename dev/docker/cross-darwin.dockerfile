@@ -2,7 +2,7 @@
 # check=experimental=all
 #
 # Build image of a macOS target. The osxcross wrappers of the llvm flavor compile
-# and link for the target with clang and ld64.lld of LLVM 22, the macOS 11.1
+# and link for the target with clang and ld64.lld of LLVM 23, the macOS 11.1
 # SDK, and compiler-rt. clang compiles and links for the build machine on the
 # glibc 2.17 sysroot of a crosstool-NG GCC 16 toolchain. These are the
 # toolchains of the TreeTime images that link the archives.

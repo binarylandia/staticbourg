@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=experimental=all
 #
-# Build image of a Linux target. clang and lld of LLVM 22 compile and link for
+# Build image of a Linux target. clang and lld of LLVM 23 compile and link for
 # the target and for the build machine, each on the sysroot, crt files, libgcc,
 # and libstdc++ of a crosstool-NG GCC 16 toolchain: glibc 2.17 for the gnu
 # targets and the build machine, musl 1.2.6 for the musl targets. These are the
