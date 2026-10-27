@@ -5,6 +5,10 @@
 # Build static libffi for CROSS_COMPILE from the checksum-verified release
 # tarball, and package it. dev/cross/build sets the environment.
 #
+# configure runs in the source folder (--disable-builddir): libffi 3.8.0
+# re-runs configure in a folder named after the target and garbles the target
+# in that run, so its checks fail for the musl and aarch64 targets.
+#
 # shellcheck disable=SC2155
 set -euo pipefail
 trap "exit" INT
@@ -43,6 +47,7 @@ pushd "${src_dir}" >/dev/null
   nicely "${configure[*]}" \
     --prefix="${install_dir}" \
     --host="$(autoconf_host "${CROSS_COMPILE}")" \
+    --disable-builddir \
     --disable-multi-os-directory \
     --disable-docs \
     --enable-shared=no \
