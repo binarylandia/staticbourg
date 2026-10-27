@@ -53,6 +53,8 @@ pushd "${src_dir}" >/dev/null
 {
   # Run `./Configure LIST` to display all possible platforms
   configure_args=(--openssldir="/etc/ssl")
+  # nicely runs the command through `bash -c`, so an argument with spaces carries
+  # its own quotes.
   case "${CROSS_COMPILE}" in
   x86_64-unknown-linux-*)
     platform="linux-x86_64"
@@ -62,11 +64,11 @@ pushd "${src_dir}" >/dev/null
     ;;
   x86_64-pc-windows-gnu | x86_64-pc-windows-gnullvm)
     platform="mingw64"
-    configure_args=(--openssldir="C:/Program Files/Common Files/SSL" -DOSSL_WINCTX=binarylandia)
+    configure_args=("--openssldir='C:/Program Files/Common Files/SSL'" -DOSSL_WINCTX=binarylandia)
     ;;
   aarch64-pc-windows-gnullvm)
     platform="mingwarm64"
-    configure_args=(--openssldir="C:/Program Files/Common Files/SSL" -DOSSL_WINCTX=binarylandia --config="${task_dir}/mingwarm64.conf" no-asm)
+    configure_args=("--openssldir='C:/Program Files/Common Files/SSL'" -DOSSL_WINCTX=binarylandia --config="${task_dir}/mingwarm64.conf" no-asm)
     ;;
   aarch64-apple-darwin)
     platform="darwin64-arm64"
