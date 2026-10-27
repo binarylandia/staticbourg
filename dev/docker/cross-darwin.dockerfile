@@ -6,7 +6,7 @@
 # SDK, and compiler-rt. clang compiles and links for the build machine on the
 # glibc 2.17 sysroot of a crosstool-NG GCC 16 toolchain. These are the
 # toolchains of the TreeTime images that link the archives.
-FROM debian:12.15-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
+FROM debian:13.7-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
 
 SHELL ["bash", "-euxo", "pipefail", "-c"]
 
@@ -58,6 +58,9 @@ RUN set -euxo pipefail >/dev/null \
 && apt-get clean autoclean >/dev/null \
 && apt-get autoremove --yes >/dev/null \
 && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+COPY --link "dev/docker/files/distrust-compromised-roots" "/"
+RUN /distrust-compromised-roots
 
 COPY --link "dev/docker/files/fetch" "dev/docker/files/checksums" "/"
 

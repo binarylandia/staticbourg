@@ -279,7 +279,7 @@ export -f recorded_sha256
 # Name of a target in package names. Emscripten gives no ABI guarantee between
 # versions, so a WebAssembly library links only with the Emscripten version that
 # built it, and its package name carries that version
-# (wasm32-unknown-emscripten.6.0.10).
+# (wasm32-unknown-emscripten.6.0.13).
 function package_target_name() {
   local target="${1:?target}"
   if [[ "${target}" == wasm32-*-emscripten ]]; then

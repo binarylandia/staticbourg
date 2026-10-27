@@ -46,7 +46,7 @@ The toolchains are binarylandia releases, the same as in the [TreeTime](https://
 | `x86_64-pc-windows-gnullvm` | llvm-mingw 22.1.8 | UCRT | | `-march=x86-64-v2` |
 | `aarch64-pc-windows-gnullvm` | llvm-mingw 22.1.8 | UCRT | | `-march=armv8-a+lse` |
 | `x86_64-pc-windows-gnu` | MinGW GCC 16.2.0 | msvcrt | Windows 7 (`_WIN32_WINNT=0x0601`) | `-march=x86-64-v2` |
-| `wasm32-unknown-emscripten` | Emscripten 6.0.10 | | | |
+| `wasm32-unknown-emscripten` | Emscripten 6.0.13 | | | |
 
 The toolchain archives are pinned with their sha256 in `dev/docker/files/`. The x86_64 and arm64 Linux baselines let the archives run on every CPU that their consumers support: x86-64-v2 has no AVX, and Armv8.0 runs on Cortex-A53 and Cortex-A72 cores, with LSE atomics through the outline atomics helpers where the CPU has them. Windows on Arm requires LSE, and the Windows targets have no outline atomics helpers.
 
@@ -79,7 +79,7 @@ OpenSSL finds its configuration file and the default trust store (`cert.pem` and
 - Optimized builds (-O3, vectorization, loop unrolling)
 - Sources downloaded from the upstream releases and verified by sha256 (`tasks/<name>/checksums`)
 - Multiple compression formats (xz, gzip, zstd)
-- WebAssembly archives of lzma and zstd for Emscripten, built with `emcc` and without threads. Emscripten has no ABI guarantee between versions, so these archives link only with the Emscripten version in their name (`wasm32-unknown-emscripten.6.0.10`), which `share/emscripten-version.txt` also records
+- WebAssembly archives of lzma and zstd for Emscripten, built with `emcc` and without threads. Emscripten has no ABI guarantee between versions, so these archives link only with the Emscripten version in their name (`wasm32-unknown-emscripten.6.0.13`), which `share/emscripten-version.txt` also records
 
 ## Use Cases
 
