@@ -18,10 +18,20 @@ export PROJECT_ROOT="$(project_root)"
 function build_one_name() {
   set -euxo pipefail
   trap "exit" INT
+  # GNU parallel passes exported functions but no arrays, so the task and target
+  # lists come from the library again.
+  # shellcheck source=./../lib/utils.sh
+  source "${PROJECT_ROOT:?}/dev/lib/utils.sh"
 
   local name="${1:?}"
   declare -x CROSS_COMPILE="${CROSS_COMPILE:?}"
   declare -x BUILD_TIME="${BUILD_TIME:?}"
+
+  if [[ "${CROSS_COMPILE}" != "${WASM_TARGET}" ]] &&
+    ! task_targets "${PROJECT_ROOT:?}" "${name}" | grep -qxF "${CROSS_COMPILE}"; then
+    info "Skipping '${name}' for '${CROSS_COMPILE}', which tasks/${name}/targets does not list"
+    return
+  fi
 
   local variants=("plain") variant
   if [[ "${CROSS_COMPILE}" == "${WASM_TARGET}" ]]; then
@@ -40,6 +50,8 @@ export -f build_one_name
 function run_one() {
   set -euxo pipefail
   trap "exit" INT
+  # shellcheck source=./../lib/utils.sh
+  source "${PROJECT_ROOT:?}/dev/lib/utils.sh"
 
   declare -x CROSS_COMPILE="${1:?}"
   local name="${2:-}"

@@ -225,12 +225,23 @@ export -f package_all
 
 # Download a source tarball, verify it against its sha256 in a checksums file
 # (lines of "<sha256>  <file name>", keyed by the file name of the URL), and
-# unpack it into a directory without its top-level folder. A missing or
-# different checksum fails.
+# unpack it into a directory without its top-level folder. Further arguments
+# name the paths below the top-level folder to unpack, for example the parts of
+# the LLVM source that one runtime needs; by default everything unpacks. A
+# missing or different checksum fails.
 function fetch_verified_tarball() {
   local url="${1:?url}"
   local checksums="${2:?checksums file}"
   local dest_dir="${3:?destination}"
+  shift 3
+  local members=()
+  if (($# > 0)); then
+    local top="${url##*/}" part
+    top="${top%.tar.*}"
+    for part in "$@"; do
+      members+=("${top}/${part}")
+    done
+  fi
   local expected actual tmp
   expected="$(recorded_sha256 "${url}" "${checksums}")"
   tmp="$(mktemp)"
@@ -243,7 +254,7 @@ function fetch_verified_tarball() {
   fi
   rm -rf "${dest_dir}"
   mkdir -p "${dest_dir}"
-  tar -xf "${tmp}" -C "${dest_dir}" --strip-components=1
+  tar -xf "${tmp}" -C "${dest_dir}" --strip-components=1 "${members[@]}"
   rm -f "${tmp}"
 }
 export -f fetch_verified_tarball
@@ -530,6 +541,20 @@ function cmake_toolchain_file() {
 export -f cmake_toolchain_file
 
 # Print the names of the tasks (tasks/<name>/build) of a checkout, sorted.
+# Print the native targets of a task, one per line: the lines of
+# tasks/<task>/targets when the task has that file, otherwise NATIVE_TARGETS.
+function task_targets() {
+  local root="${1:?project root}"
+  local task="${2:?task}"
+  local file="${root}/tasks/${task}/targets"
+  if [[ -f "${file}" ]]; then
+    grep -vE '^\s*(#|$)' "${file}"
+  else
+    printf '%s\n' "${NATIVE_TARGETS[@]}"
+  fi
+}
+export -f task_targets
+
 function task_names() {
   local root="${1:?project root}"
   find "${root}/tasks" -mindepth 2 -maxdepth 2 -type f -name "build" -printf '%h\n' | sed 's|.*/||' | LC_ALL=C sort

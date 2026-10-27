@@ -79,16 +79,16 @@ function check_commit() {
 }
 
 # Fail unless the build records cover the full set of archives once each: every
-# task for every native target, and the WebAssembly tasks for WASM_TARGET in
-# every variant of WASM_VARIANTS.
+# task for each of its native targets (task_targets), and the WebAssembly tasks
+# for WASM_TARGET in every variant of WASM_VARIANTS.
 function check_matrix() {
   local records=("$@")
   local task target expected actual
   expected="$(
     while IFS= read -r task; do
-      for target in "${NATIVE_TARGETS[@]}"; do
+      while IFS= read -r target; do
         printf '%s %s plain\n' "${task}" "${target}"
-      done
+      done < <(task_targets "${ROOT_DIR}" "${task}")
     done < <(task_names "${ROOT_DIR}")
     local variant
     for task in "${WASM_TASKS[@]}"; do
