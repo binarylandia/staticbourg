@@ -45,7 +45,7 @@ The toolchains are binarylandia releases, the same as in the [TreeTime](https://
 | `aarch64-apple-darwin` | osxcross (macOS 11.1 SDK) on LLVM 22.1.8 | | macOS 11.0 | `-mcpu=apple-m1` |
 | `x86_64-pc-windows-gnullvm` | llvm-mingw 22.1.8 | UCRT | | `-march=x86-64-v2` |
 | `aarch64-pc-windows-gnullvm` | llvm-mingw 22.1.8 | UCRT | | `-march=armv8-a+lse` |
-| `x86_64-pc-windows-gnu` | MinGW GCC 16.2.0 | msvcrt | Windows 7 (`_WIN32_WINNT=0x0601`) | `-march=x86-64-v2` |
+| `x86_64-pc-windows-gnu` | clang of LLVM 22.1.8 on the MinGW GCC 16.2.0 toolchain | msvcrt | Windows 7 (`_WIN32_WINNT=0x0601`) | `-march=x86-64-v2` |
 | `wasm32-unknown-emscripten` | Emscripten 6.0.13 | | | |
 
 The toolchain archives are pinned with their sha256 in `dev/docker/files/`. The x86_64 and arm64 Linux baselines let the archives run on every CPU that their consumers support: x86-64-v2 has no AVX, and Armv8.0 runs on Cortex-A53 and Cortex-A72 cores, with LSE atomics through the outline atomics helpers where the CPU has them. Windows on Arm requires LSE, and the Windows targets have no outline atomics helpers.
