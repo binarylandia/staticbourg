@@ -19,7 +19,10 @@
 # there. The Windows libraries read OPENSSLDIR from the registry key
 # HKLM\SOFTWARE\WOW6432Node\OpenSSL-3.5-binarylandia instead (OSSL_WINCTX),
 # which only administrators can write; without the key they load no
-# configuration and trust no default store.
+# configuration and trust no default store. The few paths that OpenSSL still
+# compiles in on Windows, such as the default CT log list, lie in
+# C:/Program Files/Common Files/SSL, which only administrators can create, as
+# in the MinGW builds of OpenSSL itself.
 #
 # shellcheck disable=SC2155
 set -euo pipefail
@@ -59,11 +62,11 @@ pushd "${src_dir}" >/dev/null
     ;;
   x86_64-pc-windows-gnu | x86_64-pc-windows-gnullvm)
     platform="mingw64"
-    configure_args=(-DOSSL_WINCTX=binarylandia)
+    configure_args=(--openssldir="C:/Program Files/Common Files/SSL" -DOSSL_WINCTX=binarylandia)
     ;;
   aarch64-pc-windows-gnullvm)
     platform="mingwarm64"
-    configure_args=(-DOSSL_WINCTX=binarylandia --config="${task_dir}/mingwarm64.conf" no-asm)
+    configure_args=(--openssldir="C:/Program Files/Common Files/SSL" -DOSSL_WINCTX=binarylandia --config="${task_dir}/mingwarm64.conf" no-asm)
     ;;
   aarch64-apple-darwin)
     platform="darwin64-arm64"
