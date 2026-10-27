@@ -101,13 +101,20 @@ pushd "${src_dir}" >/dev/null
   nicely make -s -j"${JOBS}" 2>&1 | log "${build_dir}/build.log"
   nicely make -s install_sw 2>&1 | log "${build_dir}/build.log"
 
-  # The compiled-in paths must not point into the build machine.
+  # The compiled-in paths must not point into the build machine. On Windows the
+  # registry lookup of OSSL_WINCTX must be compiled in; OpenSSL_version() of
+  # OpenSSL 3.5 reports it as `OSSL_WINCTX: "OSSL_WINCTX"`, because it
+  # stringifies the macro without expanding it.
   case "${CROSS_COMPILE}" in
-  *-windows-*) expected='OSSL_WINCTX: "binarylandia"' ;;
+  *-windows-*) expected='OSSL_WINCTX: "' ;;
   *) expected='OPENSSLDIR: "/etc/ssl"' ;;
   esac
   if ! grep -aqF "${expected}" "${install_dir}/lib/libcrypto.a"; then
     printf 'libcrypto.a of %s lacks %s\n' "${CROSS_COMPILE}" "${expected}" >&2
+    exit 1
+  fi
+  if grep -aqF "${install_dir}" "${install_dir}/lib/libcrypto.a"; then
+    printf 'libcrypto.a of %s names the build folder %s\n' "${CROSS_COMPILE}" "${install_dir}" >&2
     exit 1
   fi
 
